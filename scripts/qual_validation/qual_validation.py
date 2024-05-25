@@ -27,6 +27,7 @@ parser = argparse.ArgumentParser(description="Qualification Tool Validation")
 parser.add_argument("--cpu_log", type=str, help="Directory of CPU event log(s)", required=True)
 parser.add_argument("--gpu_log", type=str, help="Directory of GPU event log(s)", required=True)
 parser.add_argument("--output", type=str, help="Output folder for storing logs", required=True)
+parser.add_argument("--estimation", type=str, default="xgboost", help="Estimation model (xgboost or speedsup)")
 parser.add_argument("--platform", type=str, default="onprem", help="Platform name (e.g. onprem, dataproc, databricks-aws")
 parser.add_argument("--cpu_profile", type=str, help="Directory of CPU profiler log(s)")
 parser.add_argument("--gpu_profile", type=str, help="Directory of GPU profiler log(s)")
@@ -37,6 +38,7 @@ args = parser.parse_args()
 cpu_log = args.cpu_log
 gpu_log = args.gpu_log
 output = args.output
+estimation = args.estimation
 platform = args.platform
 cpu_profile = args.cpu_profile
 gpu_profile = args.gpu_profile
@@ -75,7 +77,7 @@ clusters = {
     'emr': 'emr-cluster.json'
 }
 cluster = clusters[platform]
-subprocess.run(f"spark_rapids qualification --platform {platform} --cluster {cluster} {jar_arg} --estimation_model xgboost --output_folder {cpu_tmp_dir} --eventlogs {cpu_log} {verbose}", shell=True)
+subprocess.run(f"spark_rapids qualification --platform {platform} --cluster {cluster} {jar_arg} --estimation_model {estimation} --output_folder {cpu_tmp_dir} --eventlogs {cpu_log} {verbose}", shell=True)
 
 # Parse and validate results
 
