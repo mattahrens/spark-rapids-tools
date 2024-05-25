@@ -65,17 +65,17 @@ else:
     gpu_profile_dir = f"{output}/gpu_profile"
     subprocess.run(f"spark_rapids profiling --csv {jar_arg} --output_folder {gpu_profile_dir} --eventlogs {gpu_log} {verbose}", shell=True)
 
-### run CPU profiler if needed
-cpu_profile_dir = ""
-if cpu_profile is not None:
-    cpu_profile_dir = cpu_profile
-else:
-    cpu_profile_dir = f"{output}/cpu_profile"
-    subprocess.run(f"spark_rapids profiling --csv {jar_arg} --output_folder {cpu_profile_dir} --eventlogs {cpu_log} {verbose}", shell=True)
-
 ### run CPU qualification with xgboost model
 cpu_tmp_dir = f"{output}/cpu"
-subprocess.run(f"spark_rapids qualification --platform {platform} {jar_arg} --estimation_model xgboost --output_folder {cpu_tmp_dir} --eventlogs {cpu_log} {verbose}", shell=True)
+clusters = {
+    'onprem': 'onprem-cluster.yml',
+    'dataproc': 'dataproc-cluster.yml',
+    'databricks-aws': 'databricks-aws-cluster.json',
+    'databricks-azure': 'databricks-azure-cluster.json',
+    'emr': 'emr-cluster.json'
+}
+cluster = clusters[platform]
+subprocess.run(f"spark_rapids qualification --platform {platform} --cluster {cluster} {jar_arg} --estimation_model xgboost --output_folder {cpu_tmp_dir} --eventlogs {cpu_log} {verbose}", shell=True)
 
 # Parse and validate results
 
@@ -83,55 +83,107 @@ subprocess.run(f"spark_rapids qualification --platform {platform} {jar_arg} --es
 cpu_app_info = pd.read_csv(glob.glob(f"{cpu_tmp_dir}/*/qualification_summary.csv")[0])
 cpu_query_info = cpu_app_info[["App Name", "App Duration", "Estimated GPU Duration", "Estimated GPU Speedup", "Unsupported Operators Stage Duration Percent", "Speedup Based Recommendation", "Estimated GPU Speedup Category"]]
 cpu_query_info["Qualified"] = cpu_query_info["Estimated GPU Speedup Category"].apply(lambda x: x in {'Small', 'Medium', 'Large'})
+cpu_query_info["Legacy Qualified"] = cpu_query_info["Speedup Based Recommendation"].apply(lambda x: x in {'Strongly Recommended', 'Recommended'})
 
 ### GPU log parsing
-gpu_query_info = pd.DataFrame(columns = ['App Name', 'GPU Duration'])
-counter = 0
+gpu_app_info = pd.read_csv(glob.glob(f"{gpu_profile_dir}/*/rapids_4_spark_profile/*/application_information.csv")[0])
+#gpu_query_info = pd.DataFrame(columns = ['App Name', 'GPU Duration'])
+gpu_query_info = gpu_app_info[['appName', 'duration']]
+gpu_query_info['GPU Duration'] = gpu_query_info[['duration']]
 
-for app in glob.glob(f"{gpu_profile_dir}/*/rapids_4_spark_profile/*/application_information.csv"):
-    app_info = pd.read_csv(app)
-    new_row = pd.DataFrame({'App Name': app_info.loc[0]["appName"], 'GPU Duration': app_info.loc[0]["duration"]}, index=[counter])
-    gpu_query_info = pd.concat([gpu_query_info, new_row])
-    counter = counter+1
+#counter = 0
 
-merged_info = cpu_query_info.merge(gpu_query_info, left_on='App Name', right_on='App Name')
+#for app in glob.glob(f"{gpu_profile_dir}/*/rapids_4_spark_profile/*/application_information.csv"):
+#    app_info = pd.read_csv(app)
+#    new_row = pd.DataFrame({'App Name': app_info.loc[0]["appName"], 'GPU Duration': app_info.loc[0]["duration"]}, index=[counter])
+#    gpu_query_info = pd.concat([gpu_query_info, new_row])
+#    counter = counter+1
+
+#merged_info = cpu_query_info.merge(gpu_query_info, left_on='App Name', right_on='App Name')
+merged_info = cpu_query_info.merge(gpu_query_info, left_index=True, right_index=True)
 merged_info["GPU Speedup"] = (merged_info["App Duration"]/merged_info["GPU Duration"]).apply(lambda x: round(x,2))
 
 speedup_threshold = 1.3
+total = len(merged_info)
 merged_info["True Positive"] = ((merged_info["Qualified"] == True) & (merged_info["GPU Speedup"] > speedup_threshold))
 merged_info["False Positive"] = ((merged_info["Qualified"] == True) & (merged_info["GPU Speedup"] <= speedup_threshold))
 merged_info["True Negative"] = ((merged_info["Qualified"] != True) & (merged_info["GPU Speedup"] <= speedup_threshold))
 merged_info["False Negative"] = ((merged_info["Qualified"] != True) & (merged_info["GPU Speedup"] > speedup_threshold))
-
 tp_count = merged_info["True Positive"].sum()
 fp_count = merged_info["False Positive"].sum()
 tn_count = merged_info["True Negative"].sum()
 fn_count = merged_info["False Negative"].sum()
-total = len(merged_info)
 
-print("==================================================")
-print("              Application Details")
-print("==================================================")
-print(tabulate(merged_info, headers='keys', tablefmt='psql'))
+merged_info["Legacy True Positive"] = ((merged_info["Legacy Qualified"] == True) & (merged_info["GPU Speedup"] > speedup_threshold))
+merged_info["Legacy False Positive"] = ((merged_info["Legacy Qualified"] == True) & (merged_info["GPU Speedup"] <= speedup_threshold))
+merged_info["Legacy True Negative"] = ((merged_info["Legacy Qualified"] != True) & (merged_info["GPU Speedup"] <= speedup_threshold))
+merged_info["Legacy False Negative"] = ((merged_info["Legacy Qualified"] != True) & (merged_info["GPU Speedup"] > speedup_threshold))
+tp_count_legacy = merged_info["Legacy True Positive"].sum()
+fp_count_legacy = merged_info["Legacy False Positive"].sum()
+tn_count_legacy = merged_info["Legacy True Negative"].sum()
+fn_count_legacy = merged_info["Legacy False Negative"].sum()
 
-print("\n")
-print("==================================================")
-print("              Classification Metrics")
-print("==================================================")
-print(f"Total count          = {total}")
-print(f"True Positive count  = {tp_count}")
-print(f"False Positive count = {fp_count}")
-print(f"True Negative count  = {tn_count}")
-print(f"False Negative count = {fn_count}")
-if (tp_count + fp_count + tn_count + fn_count) != 0:
-    print(f"Accuracy             = {round(100.0*(tp_count+tn_count)/(tp_count+fp_count+fn_count+tn_count),2)}")
-else:
-    print(f"Accuracy             = N/A (no classified apps)")
-if (tp_count + fp_count) != 0:
-    print(f"Precision            = {round(100.0*tp_count/(tp_count+fp_count),2)}")
-else:
-    print(f"Precision            = N/A (no predicted positive apps)")
-if (tp_count + fn_count) != 0:
-    print(f"Recall               = {round(100.0*tp_count/(tp_count+fn_count),2)}")
-else:
-    print(f"Recall               = N/A (no actual positive apps)")
+if verbose:
+    print("==================================================")
+    print("              Application Details")
+    print("==================================================")
+    print(tabulate(merged_info, headers='keys', tablefmt='psql'))
+    
+    print("\n")
+    print("==================================================")
+    print("              Classification Metrics")
+    print("==================================================")
+    print(f"Total count          = {total}")
+    print(f"True Positive count  = {tp_count}")
+    print(f"False Positive count = {fp_count}")
+    print(f"True Negative count  = {tn_count}")
+    print(f"False Negative count = {fn_count}")
+    if (tp_count + fp_count + tn_count + fn_count) != 0:
+        print(f"Accuracy             = {round(100.0*(tp_count+tn_count)/(tp_count+fp_count+fn_count+tn_count),2)}")
+    else:
+        print(f"Accuracy             = N/A (no classified apps)")
+    if (tp_count + fp_count) != 0:
+        print(f"Precision            = {round(100.0*tp_count/(tp_count+fp_count),2)}")
+    else:
+        print(f"Precision            = N/A (no predicted positive apps)")
+    if (tp_count + fn_count) != 0:
+        print(f"Recall               = {round(100.0*tp_count/(tp_count+fn_count),2)}")
+    else:
+        print(f"Recall               = N/A (no actual positive apps)")
+
+    print("\n")
+    print("==================================================")
+    print("              Classification Metrics (Legacy)")
+    print("==================================================")
+    print(f"Total count          = {total}")
+    print(f"True Positive count  = {tp_count_legacy}")
+    print(f"False Positive count = {fp_count_legacy}")
+    print(f"True Negative count  = {tn_count_legacy}")
+    print(f"False Negative count = {fn_count_legacy}")
+    if (tp_count_legacy + fp_count_legacy + tn_count_legacy + fn_count_legacy) != 0:
+        print(f"Accuracy             = {round(100.0*(tp_count_legacy+tn_count_legacy)/(tp_count_legacy+fp_count_legacy+fn_count_legacy+tn_count_legacy),2)}")
+    else:
+        print(f"Accuracy             = N/A (no classified apps)")
+    if (tp_count_legacy + fp_count_legacy) != 0:
+        print(f"Precision            = {round(100.0*tp_count_legacy/(tp_count_legacy+fp_count_legacy),2)}")
+    else:
+        print(f"Precision            = N/A (no predicted positive apps)")
+    if (tp_count_legacy + fn_count_legacy) != 0:
+        print(f"Recall               = {round(100.0*tp_count_legacy/(tp_count_legacy+fn_count_legacy),2)}")
+    else:
+        print(f"Recall               = N/A (no actual positive apps)")
+
+output_data = {
+    'cpu_log': [cpu_log],
+    'gpu_log': [gpu_log],
+    'tp_count': [tp_count],
+    'fp_count': [fp_count],
+    'tn_count': [tn_count],
+    'fn_count': [fn_count],
+    'tp_count_legacy': [tp_count_legacy],
+    'fp_count_legacy': [fp_count_legacy],
+    'tn_count_legacy': [tn_count_legacy],
+    'fn_count_legacy': [fn_count_legacy]
+}
+output_df = pd.DataFrame(output_data)
+output_df.to_csv(f"{output}/summary.csv", index=False)

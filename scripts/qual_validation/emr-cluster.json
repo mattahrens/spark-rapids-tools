@@ -1,0 +1,242 @@
+{
+    "Cluster": {
+        "Id": "j-3RV1005MDDES6",
+        "Name": "user-tools-qualification-emr-111",
+        "Status": {
+            "State": "TERMINATED",
+            "StateChangeReason": {
+                "Code": "USER_REQUEST",
+                "Message": "Terminated by user request"
+            },
+            "Timeline": {
+                "CreationDateTime": 1711350618.521,
+                "ReadyDateTime": 1711351091.192,
+                "EndDateTime": 1711352144.761
+            }
+        },
+        "Ec2InstanceAttributes": {
+            "Ec2KeyName": "emr-key-pair",
+            "RequestedEc2SubnetIds": [],
+            "Ec2AvailabilityZone": "us-west-2b",
+            "RequestedEc2AvailabilityZones": [
+                "us-west-2b"
+            ],
+            "IamInstanceProfile": "EMR_EC2_DefaultRole",
+            "EmrManagedMasterSecurityGroup": "sg-0c39fa082703b81ad",
+            "EmrManagedSlaveSecurityGroup": "sg-08f5590de1f1924fd"
+        },
+        "InstanceCollectionType": "INSTANCE_GROUP",
+        "ReleaseLabel": "emr-6.9.0",
+        "AutoTerminate": false,
+        "TerminationProtected": false,
+        "VisibleToAllUsers": true,
+        "Applications": [
+            {
+                "Name": "Hadoop",
+                "Version": "3.3.3"
+            },
+            {
+                "Name": "Spark",
+                "Version": "3.3.0"
+            },
+            {
+                "Name": "Livy",
+                "Version": "0.7.1"
+            },
+            {
+                "Name": "JupyterEnterpriseGateway",
+                "Version": "2.6.0"
+            }
+        ],
+        "Tags": [],
+        "ServiceRole": "EMR_DefaultRole",
+        "NormalizedInstanceHours": 288,
+        "MasterPublicDnsName": "ec2-54-213-227-156.us-west-2.compute.amazonaws.com",
+        "Configurations": [
+            {
+                "Classification": "spark",
+                "Properties": {
+                    "enableSparkRapids": "true"
+                }
+            },
+            {
+                "Classification": "yarn-site",
+                "Properties": {
+                    "yarn.nodemanager.container-executor.class": "org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor",
+                    "yarn.nodemanager.linux-container-executor.cgroups.hierarchy": "yarn",
+                    "yarn.nodemanager.linux-container-executor.cgroups.mount": "true",
+                    "yarn.nodemanager.linux-container-executor.cgroups.mount-path": "/sys/fs/cgroup"
+                }
+            },
+            {
+                "Classification": "container-executor",
+                "Configurations": [
+                    {
+                        "Classification": "cgroups",
+                        "Properties": {
+                            "root": "/sys/fs/cgroup",
+                            "yarn-hierarchy": "yarn"
+                        }
+                    }
+                ],
+                "Properties": {}
+            },
+            {
+                "Classification": "spark-defaults",
+                "Properties": {
+                    "spark.eventLog.dir": "s3://rapids-emr/event-log-user-tools-qualification-emr-111",
+                    "spark.executor.cores": "16",
+                    "spark.executor.extraLibraryPath": "/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/compat/lib:/usr/local/cuda/lib:/usr/local/cuda/lib64:/usr/lib/hadoop/lib/native:/usr/lib/hadoop-lzo/lib/native:/docker/usr/lib/hadoop/lib/native:/docker/usr/lib/hadoop-lzo/lib/native",
+                    "spark.executor.memoryOverhead": "2G",
+                    "spark.locality.wait": "0s",
+                    "spark.sql.adaptive.enabled": "false",
+                    "spark.sql.files.maxPartitionBytes": "256m",
+                    "spark.sql.sources.useV1SourceList": "",
+                    "spark.task.cpus ": "1"
+                }
+            },
+            {
+                "Classification": "capacity-scheduler",
+                "Properties": {
+                    "yarn.scheduler.capacity.resource-calculator": "org.apache.hadoop.yarn.util.resource.DominantResourceCalculator"
+                }
+            }
+        ],
+        "ScaleDownBehavior": "TERMINATE_AT_TASK_COMPLETION",
+        "EbsRootVolumeSize": 100,
+        "KerberosAttributes": {},
+        "ClusterArn": "arn:aws:elasticmapreduce:us-west-2:503960270539:cluster/j-3RV1005MDDES6",
+        "StepConcurrencyLevel": 1,
+        "PlacementGroups": [],
+        "OSReleaseLabel": "2.0.20230808.0",
+        "BootstrapActions": [
+            {
+                "Name": "Spark Rapids default bootstrap action",
+                "ScriptPath": "s3://rapids-emr/nds2-111/bootstrap.sh",
+                "Args": []
+            }
+        ],
+        "InstanceGroups": [
+            {
+                "Id": "ig-3TRLG8EUJEIJX",
+                "Name": "CORE",
+                "Market": "ON_DEMAND",
+                "InstanceGroupType": "CORE",
+                "InstanceType": "m5zn.6xlarge",
+                "RequestedInstanceCount": 4,
+                "RunningInstanceCount": 0,
+                "Status": {
+                    "State": "TERMINATED",
+                    "StateChangeReason": {
+                        "Code": "CLUSTER_TERMINATED",
+                        "Message": "Job flow terminated"
+                    },
+                    "Timeline": {
+                        "CreationDateTime": 1711350618.54,
+                        "ReadyDateTime": 1711351091.192,
+                        "EndDateTime": 1711352144.741
+                    }
+                },
+                "Configurations": [],
+                "ConfigurationsVersion": 0,
+                "LastSuccessfullyAppliedConfigurations": [],
+                "LastSuccessfullyAppliedConfigurationsVersion": 0,
+                "EbsBlockDevices": [
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 500
+                        },
+                        "Device": "/dev/sdb"
+                    },
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 500
+                        },
+                        "Device": "/dev/sdc"
+                    },
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 500
+                        },
+                        "Device": "/dev/sdd"
+                    },
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 500
+                        },
+                        "Device": "/dev/sde"
+                    },
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 500
+                        },
+                        "Device": "/dev/sdf"
+                    },
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 500
+                        },
+                        "Device": "/dev/sdg"
+                    },
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 500
+                        },
+                        "Device": "/dev/sdh"
+                    },
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 500
+                        },
+                        "Device": "/dev/sdi"
+                    }
+                ],
+                "EbsOptimized": true,
+                "ShrinkPolicy": {}
+            },
+            {
+                "Id": "ig-1S6DWDG1DO6Z8",
+                "Name": "MASTER",
+                "Market": "ON_DEMAND",
+                "InstanceGroupType": "MASTER",
+                "InstanceType": "m5a.12xlarge",
+                "RequestedInstanceCount": 1,
+                "RunningInstanceCount": 0,
+                "Status": {
+                    "State": "TERMINATED",
+                    "StateChangeReason": {
+                        "Code": "CLUSTER_TERMINATED",
+                        "Message": "Job flow terminated"
+                    },
+                    "Timeline": {
+                        "CreationDateTime": 1711350618.54,
+                        "ReadyDateTime": 1711351064.724,
+                        "EndDateTime": 1711352144.741
+                    }
+                },
+                "Configurations": [],
+                "ConfigurationsVersion": 0,
+                "LastSuccessfullyAppliedConfigurations": [],
+                "LastSuccessfullyAppliedConfigurationsVersion": 0,
+                "EbsBlockDevices": [
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 192
+                        },
+                        "Device": "/dev/sdb"
+                    }
+                ],
+                "ShrinkPolicy": {}
+            }
+        ]
+    }
+}

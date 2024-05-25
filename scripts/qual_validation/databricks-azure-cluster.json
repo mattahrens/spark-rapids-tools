@@ -1,0 +1,67 @@
+{
+  "autotermination_minutes":120,
+  "azure_attributes": {
+    "availability":"ON_DEMAND_AZURE",
+    "first_on_demand":1,
+    "spot_bid_max_price":-1
+  },
+  "cluster_id":"0508-195300-t2x0a47l",
+  "cluster_log_conf": {
+    "dbfs": {
+      "destination":"dbfs:/root/scratch/cluster-logs"
+    }
+  },
+  "cluster_log_status": {
+    "last_attempted":1715205616487
+  },
+  "cluster_name":"gtl-spark-ab-benchmark",
+  "cluster_source":"API",
+  "creator_user_name":"kyip@nvidia.com",
+  "data_security_mode":"LEGACY_SINGLE_USER_STANDARD",
+  "default_tags": {
+    "ClusterId":"0508-195300-t2x0a47l",
+    "ClusterName":"gtl-spark-ab-benchmark",
+    "Creator":"kyip@nvidia.com",
+    "Vendor":"Databricks"
+  },
+  "driver_node_type_id":"Standard_NC8as_T4_v3",
+  "init_scripts": [
+    {
+      "workspace": {
+        "destination":"/Users/kyip@nvidia.com/ab-scratch/gtl-spark-ab-benchmark-test-init.sh"
+      }
+    }
+  ],
+  "last_restarted_time":1715198364224,
+  "node_type_id":"Standard_NC8as_T4_v3",
+  "num_workers":8,
+  "runtime_engine":"STANDARD",
+  "single_user_name":"kyip@nvidia.com",
+  "spark_conf": {
+    "fs.azure.account.key.mahrens.blob.core.windows.net":"{{secrets/mahrens-azure/storage_account_access_key}}",
+    "spark.hadoop.fs.s3a.path.style.access":"true",
+    "spark.locality.wait":"0s",
+    "spark.plugins":"com.nvidia.spark.SQLPlugin",
+    "spark.rapids.filecache.enabled":"true",
+    "spark.rapids.memory.pinnedPool.size":"4G",
+    "spark.rapids.sql.concurrentGpuTasks":"2",
+    "spark.rapids.sql.multiThreadedRead.numThreads":"100",
+    "spark.shuffle.manager":"com.nvidia.spark.rapids.spark341db.RapidsShuffleManager",
+    "spark.sql.files.maxPartitionBytes":"1G",
+    "spark.sql.optimizer.dynamicPartitionPruning.enabled":"true",
+    "spark.task.resource.gpu.amount":".01"
+  },
+  "spark_context_id":1728642847049565340,
+  "spark_version":"13.3.x-gpu-ml-scala2.12",
+  "start_time":1715197980827,
+  "state":"TERMINATED",
+  "state_message":"Termination requested by kyip@nvidia.com",
+  "terminated_time":1715207478786,
+  "termination_reason": {
+    "code":"USER_REQUEST",
+    "parameters": {
+      "username":"kyip@nvidia.com"
+    },
+    "type":"SUCCESS"
+  }
+}

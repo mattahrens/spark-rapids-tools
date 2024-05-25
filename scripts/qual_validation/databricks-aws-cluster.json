@@ -1,0 +1,66 @@
+{
+  "autotermination_minutes":120,
+  "aws_attributes": {
+    "availability":"SPOT_WITH_FALLBACK",
+    "first_on_demand":1,
+    "spot_bid_price_percent":100,
+    "zone_id":"auto"
+  },
+  "cluster_id":"1101-134157-i0ctgbvo",
+  "cluster_log_conf": {
+    "dbfs": {
+      "destination":"dbfs:/matt/scratch/cluster-logs"
+    }
+  },
+  "cluster_log_status": {
+    "last_attempted":1698858487914
+  },
+  "cluster_name":"databricks-aws-a10",
+  "cluster_source":"API",
+  "creator_user_name":"mfarrellee@nvidia.com",
+  "default_tags": {
+    "ClusterId":"1101-134157-i0ctgbvo",
+    "ClusterName":"databricks-aws-a10",
+    "Creator":"mfarrellee@nvidia.com",
+    "Vendor":"Databricks"
+  },
+  "driver_node_type_id":"m5dn.4xlarge",
+  "init_scripts": [
+    {
+      "workspace": {
+        "destination":"/Users/mfarrellee@nvidia.com/ab-scratch/databricks-aws-a10-init.sh"
+      }
+    }
+  ],
+  "last_restarted_time":1698846375764,
+  "node_type_id":"g5.4xlarge",
+  "num_workers":8,
+  "runtime_engine":"STANDARD",
+  "spark_conf": {
+    "spark.hadoop.fs.s3a.access.key":"{{secrets/mahrens-s3/access_key_id}}",
+    "spark.hadoop.fs.s3a.path.style.access":"true",
+    "spark.hadoop.fs.s3a.secret.key":"{{secrets/mahrens-s3/secret_access_key}}",
+    "spark.locality.wait":"0s",
+    "spark.plugins":"com.nvidia.spark.SQLPlugin",
+    "spark.rapids.memory.pinnedPool.size":"4G",
+    "spark.rapids.sql.concurrentGpuTasks":"2",
+    "spark.rapids.sql.multiThreadedRead.numThreads":"100",
+    "spark.shuffle.manager":"com.nvidia.spark.rapids.spark332db.RapidsShuffleManager",
+    "spark.sql.files.maxPartitionBytes":"1G",
+    "spark.sql.optimizer.dynamicPartitionPruning.enabled":"true",
+    "spark.task.resource.gpu.amount":".01"
+  },
+  "spark_context_id":3645031407654349512,
+  "spark_version":"12.2.x-gpu-ml-scala2.12",
+  "start_time":1698846117810,
+  "state":"TERMINATED",
+  "state_message":"Inactive cluster terminated (inactive for 120 minutes).",
+  "terminated_time":1698858701037,
+  "termination_reason": {
+    "code":"INACTIVITY",
+    "parameters": {
+      "inactivity_duration_min":"120"
+    },
+    "type":"SUCCESS"
+  }
+}

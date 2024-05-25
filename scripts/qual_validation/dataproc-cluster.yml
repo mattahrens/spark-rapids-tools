@@ -1,0 +1,214 @@
+clusterName: qualification-demo
+clusterUuid: 86a1b020-7fe1-49d6-9a76-51d1963a9513
+config:
+  configBucket: mahrens-test
+  endpointConfig:
+    enableHttpPortAccess: true
+    httpPorts:
+      HDFS NameNode: https://dcub7jaekjdwlfzumkarv5lbxi-dot-us-central1.dataproc.googleusercontent.com/hdfs/dfshealth.html
+      HiveServer2 (qualification-demo-m): https://dcub7jaekjdwlfzumkarv5lbxi-dot-us-central1.dataproc.googleusercontent.com/hiveserver2ui/qualification-demo-m?host=qualification-demo-m
+      MapReduce Job History: https://dcub7jaekjdwlfzumkarv5lbxi-dot-us-central1.dataproc.googleusercontent.com/jobhistory/
+      Spark History Server: https://dcub7jaekjdwlfzumkarv5lbxi-dot-us-central1.dataproc.googleusercontent.com/sparkhistory/
+      Tez: https://dcub7jaekjdwlfzumkarv5lbxi-dot-us-central1.dataproc.googleusercontent.com/apphistory/tez-ui/
+      YARN Application Timeline: https://dcub7jaekjdwlfzumkarv5lbxi-dot-us-central1.dataproc.googleusercontent.com/apphistory/
+      YARN ResourceManager: https://dcub7jaekjdwlfzumkarv5lbxi-dot-us-central1.dataproc.googleusercontent.com/yarn/
+  gceClusterConfig:
+    internalIpOnly: false
+    serviceAccountScopes:
+    - https://www.googleapis.com/auth/bigquery
+    - https://www.googleapis.com/auth/bigtable.admin.table
+    - https://www.googleapis.com/auth/bigtable.data
+    - https://www.googleapis.com/auth/cloud.useraccounts.readonly
+    - https://www.googleapis.com/auth/devstorage.full_control
+    - https://www.googleapis.com/auth/devstorage.read_write
+    - https://www.googleapis.com/auth/logging.write
+    - https://www.googleapis.com/auth/monitoring.write
+    subnetworkUri: https://www.googleapis.com/compute/v1/projects/rapids-spark/regions/us-central1/subnetworks/default
+    zoneUri: https://www.googleapis.com/compute/v1/projects/rapids-spark/zones/us-central1-a
+  masterConfig:
+    diskConfig:
+      bootDiskSizeGb: 1000
+      bootDiskType: pd-standard
+    imageUri: https://www.googleapis.com/compute/v1/projects/cloud-dataproc/global/images/dataproc-2-0-ubu18-20230715-165100-rc01
+    instanceNames:
+    - qualification-demo-m
+    machineTypeUri: https://www.googleapis.com/compute/v1/projects/rapids-spark/zones/us-central1-a/machineTypes/n1-standard-16
+    minCpuPlatform: AUTOMATIC
+    numInstances: 1
+    preemptibility: NON_PREEMPTIBLE
+  softwareConfig:
+    imageVersion: 2.0.70-ubuntu18
+    properties:
+      capacity-scheduler:yarn.scheduler.capacity.root.default.ordering-policy: fair
+      core:fs.gs.block.size: '134217728'
+      core:fs.gs.metadata.cache.enable: 'false'
+      core:hadoop.ssl.enabled.protocols: TLSv1,TLSv1.1,TLSv1.2
+      distcp:mapreduce.map.java.opts: -Xmx768m
+      distcp:mapreduce.map.memory.mb: '1024'
+      distcp:mapreduce.reduce.java.opts: -Xmx768m
+      distcp:mapreduce.reduce.memory.mb: '1024'
+      hadoop-env:HADOOP_DATANODE_OPTS: -Xmx512m
+      hdfs:dfs.datanode.address: 0.0.0.0:9866
+      hdfs:dfs.datanode.http.address: 0.0.0.0:9864
+      hdfs:dfs.datanode.https.address: 0.0.0.0:9865
+      hdfs:dfs.datanode.ipc.address: 0.0.0.0:9867
+      hdfs:dfs.namenode.handler.count: '40'
+      hdfs:dfs.namenode.http-address: 0.0.0.0:9870
+      hdfs:dfs.namenode.https-address: 0.0.0.0:9871
+      hdfs:dfs.namenode.lifeline.rpc-address: qualification-demo-m:8050
+      hdfs:dfs.namenode.secondary.http-address: 0.0.0.0:9868
+      hdfs:dfs.namenode.secondary.https-address: 0.0.0.0:9869
+      hdfs:dfs.namenode.service.handler.count: '20'
+      hdfs:dfs.namenode.servicerpc-address: qualification-demo-m:8051
+      hive:hive.fetch.task.conversion: none
+      mapred-env:HADOOP_JOB_HISTORYSERVER_HEAPSIZE: '4000'
+      mapred:mapreduce.job.maps: '381'
+      mapred:mapreduce.job.reduce.slowstart.completedmaps: '0.95'
+      mapred:mapreduce.job.reduces: '127'
+      mapred:mapreduce.jobhistory.recovery.store.class: org.apache.hadoop.mapreduce.v2.hs.HistoryServerLeveldbStateStoreService
+      mapred:mapreduce.map.cpu.vcores: '1'
+      mapred:mapreduce.map.java.opts: -Xmx2941m
+      mapred:mapreduce.map.memory.mb: '3677'
+      mapred:mapreduce.reduce.cpu.vcores: '1'
+      mapred:mapreduce.reduce.java.opts: -Xmx2941m
+      mapred:mapreduce.reduce.memory.mb: '3677'
+      mapred:mapreduce.task.io.sort.mb: '256'
+      mapred:yarn.app.mapreduce.am.command-opts: -Xmx2941m
+      mapred:yarn.app.mapreduce.am.resource.cpu-vcores: '1'
+      mapred:yarn.app.mapreduce.am.resource.mb: '3677'
+      spark-env:SPARK_DAEMON_MEMORY: 4000m
+      spark:spark.driver.maxResultSize: 7680m
+      spark:spark.driver.memory: 50g
+      spark:spark.executor.cores: '8'
+      spark:spark.executor.instances: '2'
+      spark:spark.executor.memory: 26742m
+      spark:spark.executorEnv.OPENBLAS_NUM_THREADS: '1'
+      spark:spark.extraListeners: com.google.cloud.spark.performance.DataprocMetricsListener
+      spark:spark.scheduler.mode: FAIR
+      spark:spark.sql.cbo.enabled: 'true'
+      spark:spark.ui.port: '0'
+      spark:spark.yarn.am.memory: 640m
+      yarn-env:YARN_NODEMANAGER_HEAPSIZE: '4000'
+      yarn-env:YARN_RESOURCEMANAGER_HEAPSIZE: '4000'
+      yarn-env:YARN_TIMELINESERVER_HEAPSIZE: '4000'
+      yarn:yarn.nodemanager.address: 0.0.0.0:8026
+      yarn:yarn.nodemanager.resource.cpu-vcores: '32'
+      yarn:yarn.nodemanager.resource.memory-mb: '117664'
+      yarn:yarn.resourcemanager.decommissioning-nodes-watcher.decommission-if-no-shuffle-data: 'true'
+      yarn:yarn.resourcemanager.nodemanager-graceful-decommission-timeout-secs: '86400'
+      yarn:yarn.scheduler.maximum-allocation-mb: '117664'
+      yarn:yarn.scheduler.minimum-allocation-mb: '1'
+  tempBucket: dataproc-temp-us-central1-1025407039067-szilpert
+  workerConfig:
+    diskConfig:
+      bootDiskSizeGb: 1000
+      bootDiskType: pd-standard
+      localSsdInterface: NVME
+    imageUri: https://www.googleapis.com/compute/v1/projects/cloud-dataproc/global/images/dataproc-2-0-ubu18-20230715-165100-rc01
+    instanceNames:
+    - qualification-demo-w-0
+    - qualification-demo-w-1
+    - qualification-demo-w-2
+    - qualification-demo-w-3
+    machineTypeUri: https://www.googleapis.com/compute/v1/projects/rapids-spark/zones/us-central1-a/machineTypes/n1-standard-32
+    minCpuPlatform: Intel Skylake
+    numInstances: 4
+    preemptibility: NON_PREEMPTIBLE
+labels:
+  goog-dataproc-cluster-name: qualification-demo
+  goog-dataproc-cluster-uuid: 86a1b020-7fe1-49d6-9a76-51d1963a9513
+  goog-dataproc-location: us-central1
+metrics:
+  hdfsMetrics:
+    dfs-blocks-corrupt: '0'
+    dfs-blocks-default-replication-factor: '2'
+    dfs-blocks-missing: '0'
+    dfs-blocks-missing-repl-one: '0'
+    dfs-blocks-pending-deletion: '0'
+    dfs-blocks-under-replication: '0'
+    dfs-capacity-present: '4111476064256'
+    dfs-capacity-remaining: '4111475900416'
+    dfs-capacity-total: '4161770487808'
+    dfs-capacity-used: '163840'
+    dfs-nodes-decommissioned: '0'
+    dfs-nodes-decommissioning: '0'
+    dfs-nodes-running: '4'
+  yarnMetrics:
+    yarn-apps-completed: '0'
+    yarn-apps-failed: '0'
+    yarn-apps-killed: '0'
+    yarn-apps-pending: '0'
+    yarn-apps-running: '0'
+    yarn-apps-submitted: '0'
+    yarn-containers-allocated: '0'
+    yarn-containers-pending: '0'
+    yarn-containers-reserved: '0'
+    yarn-memory-mb-allocated: '0'
+    yarn-memory-mb-available: '470656'
+    yarn-memory-mb-pending: '0'
+    yarn-memory-mb-reserved: '0'
+    yarn-memory-mb-total: '470656'
+    yarn-nodes-active: '4'
+    yarn-nodes-decommissioned: '0'
+    yarn-nodes-decommissioning: '0'
+    yarn-nodes-lost: '0'
+    yarn-nodes-new: '0'
+    yarn-nodes-rebooted: '0'
+    yarn-nodes-shutdown: '0'
+    yarn-nodes-unhealthy: '0'
+    yarn-vcores-allocated: '0'
+    yarn-vcores-available: '128'
+    yarn-vcores-pending: '0'
+    yarn-vcores-reserved: '0'
+    yarn-vcores-total: '128'
+projectId: rapids-spark
+status:
+  state: STOPPED
+  stateStartTime: '2023-11-02T15:27:04.802848Z'
+statusHistory:
+- state: CREATING
+  stateStartTime: '2023-07-27T18:09:23.585496Z'
+- state: RUNNING
+  stateStartTime: '2023-07-27T18:11:46.803161Z'
+- state: STOPPING
+  stateStartTime: '2023-07-27T20:13:58.967019Z'
+- state: STOPPED
+  stateStartTime: '2023-07-27T20:16:13.671671Z'
+- state: STARTING
+  stateStartTime: '2023-07-28T16:41:55.918393Z'
+- state: RUNNING
+  stateStartTime: '2023-07-28T16:43:23.799697Z'
+- state: STOPPING
+  stateStartTime: '2023-07-30T02:24:45.083407Z'
+- state: STOPPED
+  stateStartTime: '2023-07-30T02:27:07.887900Z'
+- state: STARTING
+  stateStartTime: '2023-09-01T02:10:00.950811Z'
+- state: RUNNING
+  stateStartTime: '2023-09-01T02:11:54.241686Z'
+- state: STOPPING
+  stateStartTime: '2023-09-01T02:25:36.096510Z'
+- state: STOPPED
+  stateStartTime: '2023-09-01T02:27:17.656169Z'
+- state: STARTING
+  stateStartTime: '2023-10-12T14:59:02.083155Z'
+- state: RUNNING
+  stateStartTime: '2023-10-12T15:00:45.266405Z'
+- state: STOPPING
+  stateStartTime: '2023-10-12T15:35:30.672419Z'
+- state: STOPPED
+  stateStartTime: '2023-10-12T15:37:43.177374Z'
+- state: STARTING
+  stateStartTime: '2023-10-17T15:55:12.173111Z'
+- state: RUNNING
+  stateStartTime: '2023-10-17T15:57:19.020455Z'
+- state: STOPPING
+  stateStartTime: '2023-10-17T15:58:36.699322Z'
+- state: STOPPED
+  stateStartTime: '2023-10-17T16:01:01.970075Z'
+- state: STARTING
+  stateStartTime: '2023-11-02T14:39:56.867916Z'
+- state: RUNNING
+  stateStartTime: '2023-11-02T14:41:57.511589Z'
+- state: STOPPING
+  stateStartTime: '2023-11-02T15:24:46.915150Z'
