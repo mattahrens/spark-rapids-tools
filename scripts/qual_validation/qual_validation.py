@@ -69,6 +69,10 @@ else:
 
 ### run CPU qualification with xgboost model
 cpu_tmp_dir = f"{output}/cpu"
+
+# Prereqs for cluster CLI usage
+## az login --scope https://management.core.windows.net//.default
+## gcloud auth login
 clusters = {
     'onprem': 'onprem-cluster.yml',
     'dataproc': 'dataproc-cluster.yml',

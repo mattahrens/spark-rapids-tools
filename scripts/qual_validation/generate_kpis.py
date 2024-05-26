@@ -38,7 +38,7 @@ if args.verbose:
     verbose = "--verbose"
 
 base_dir = "/home/mahrens/qual-data"
-logs = pd.read_csv(mapping_file)
+logs = pd.read_csv(mapping_file, comment='#')
 
 output_df = pd.DataFrame()
 
