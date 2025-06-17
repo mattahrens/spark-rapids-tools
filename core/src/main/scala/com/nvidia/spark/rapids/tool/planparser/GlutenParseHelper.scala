@@ -17,12 +17,11 @@
 package com.nvidia.spark.rapids.tool.planparser
 
 import java.nio.file.Paths
-import scala.util.control.NonFatal
+
 import scala.util.matching.Regex
 
 import org.json4s.{DefaultFormats, Formats}
 import org.json4s.jackson.JsonMethods
-import org.json4s.jackson.JsonMethods.parse
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.rapids.tool.util.UTF8Source
@@ -48,7 +47,10 @@ object GlutenParseHelper extends Logging {
    * @return true if the properties indicate that it is a Gluten app
    */
   def isGlutenApp(properties: collection.Map[String, String]): Boolean = {
-    GLUTEN_SPARK_PROPS.exists { case (key, value) =>
+    // First check if Gluten is enabled
+    properties.get("spark.gluten.enabled").exists(_ == "true") &&
+    // Then check if at least one backend is configured
+    GLUTEN_SPARK_PROPS.filterKeys(_ != "spark.gluten.enabled").exists { case (key, value) =>
       properties.get(key).exists(_.matches(value))
     }
   }
@@ -78,4 +80,4 @@ object GlutenParseHelper extends Logging {
   def mapGlutenToSpark(inputStr: String): String = {
     GLUTEN_PATTERN.replaceAllIn(inputStr, m => glutenToSparkMapping.getOrElse(m.matched, m.matched))
   }
-} 
+}

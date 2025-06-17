@@ -44,4 +44,4 @@ object GlutenPlanParser {
         SQLPlanParser.parseSparkNode(node, sqlID, checker, app)
     }
   }
-} 
+}

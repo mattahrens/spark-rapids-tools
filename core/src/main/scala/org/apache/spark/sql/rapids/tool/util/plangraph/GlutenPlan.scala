@@ -39,8 +39,16 @@ class GlutenSparkPlanGraphNode(
 
 object GlutenSparkPlanGraphNode {
   def from(node: SparkPlanGraphNode): GlutenSparkPlanGraphNode = {
-    val sparkName = GlutenParseHelper.mapGlutenToSpark(node.name)
-    val sparkDesc = GlutenParseHelper.mapGlutenToSpark(node.desc)
+    val sparkName = if (node.name.contains("Unknown")) {
+      "Unknown operation"
+    } else {
+      GlutenParseHelper.mapGlutenToSpark(node.name)
+    }
+    val sparkDesc = if (node.desc.contains("Unknown")) {
+      "Unknown operation"
+    } else {
+      GlutenParseHelper.mapGlutenToSpark(node.desc)
+    }
     new GlutenSparkPlanGraphNode(node.id, node.name, node.desc, sparkName, sparkDesc, node.metrics)
   }
 }
@@ -64,9 +72,17 @@ class GlutenSparkPlanGraphCluster(
 
 object GlutenSparkPlanGraphCluster {
   def from(cluster: SparkPlanGraphCluster): GlutenSparkPlanGraphCluster = {
-    val sparkName = GlutenParseHelper.mapGlutenToSpark(cluster.name)
-    val sparkDesc = GlutenParseHelper.mapGlutenToSpark(cluster.desc)
+    val sparkName = if (cluster.name.contains("WholeStageCodegen")) {
+      "WholeStageCodegen"
+    } else {
+      GlutenParseHelper.mapGlutenToSpark(cluster.name)
+    }
+    val sparkDesc = if (cluster.desc.contains("WholeStageCodegen")) {
+      "WholeStageCodegen"
+    } else {
+      GlutenParseHelper.mapGlutenToSpark(cluster.desc)
+    }
     new GlutenSparkPlanGraphCluster(cluster.id, cluster.name, cluster.desc, sparkName,
       sparkDesc, cluster.nodes, cluster.metrics)
   }
-} 
+}
