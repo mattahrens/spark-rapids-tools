@@ -1174,8 +1174,18 @@ abstract class AutoTuner(
           maxAllowedPartitionBytesMB)
         Some(recommendedMaxPartitionBytesMB.toLong)
       } else {
-        // If task input within range: no adjustment needed
-        None
+        // If task input within range: check if scan stages have spilling
+        val scanStagesWithSpilling = getScanStagesWithSpilling()
+        if (scanStagesWithSpilling.nonEmpty) {
+          val multiplier = tuningConfigs.getEntry("MAX_PARTITION_BYTES_MULTIPLIER").getDefault.toInt
+          val reducedPartitionBytesMB = Math.max(
+            currentMaxPartitionBytesMB / multiplier,
+            minTaskInputSizeThresholdMB) // Use same minimum as task input size threshold (128MB)
+          Some(reducedPartitionBytesMB)
+        } else {
+          // No adjustment needed
+          None
+        }
       }
     }
   }
@@ -1205,9 +1215,36 @@ abstract class AutoTuner(
     val maxPartitionProp =
       getPropertyValue("spark.sql.files.maxPartitionBytes")
         .getOrElse(tuningConfigs.getEntry("MAX_PARTITION_BYTES").getDefault)
+
     val recommended =
       if (isCalculationEnabled("spark.sql.files.maxPartitionBytes")) {
-        calculateMaxPartitionBytesInMB(maxPartitionProp).map(_.toString).orNull
+        val calculatedValue = calculateMaxPartitionBytesInMB(maxPartitionProp)
+
+        // Check if scan stages have spilling and add appropriate comment only if
+        // the scan stage spilling logic was used to determine the value
+        val scanStagesWithSpilling = getScanStagesWithSpilling()
+        if (scanStagesWithSpilling.nonEmpty && calculatedValue.isDefined) {
+          // Only add comment if the calculated value is likely from scan stage spilling logic
+          // We can detect this by checking if the value is reduced by our multiplier
+          val currentMaxPartitionBytesMB = StringUtils.convertToMB(
+            maxPartitionProp, Some(ByteUnit.BYTE))
+          val multiplier = tuningConfigs.getEntry("MAX_PARTITION_BYTES_MULTIPLIER").getDefault.toInt
+          val expectedReducedValue = Math.max(
+            currentMaxPartitionBytesMB / multiplier,
+            tuningConfigs.getEntry("TASK_INPUT_SIZE_THRESHOLD")
+              .getMinAsMemory(ByteUnit.MiB))
+
+          // Only add comment if the calculated value matches what scan stage spilling would produce
+          // Only add comment if calculated value matches scan stage spilling logic result
+          if (Math.abs(calculatedValue.get - expectedReducedValue) < 1) {
+            appendOptionalComment("spark.sql.files.maxPartitionBytes",
+              s"'spark.sql.files.maxPartitionBytes' was decreased since spilling occurred " +
+                s"in scan stages (${scanStagesWithSpilling.mkString(", ")}). Reducing " +
+                s"partition size can help reduce memory pressure during file reads.")
+          }
+        }
+
+        calculatedValue.map(_.toString).orNull
       } else {
         s"${StringUtils.convertToMB(maxPartitionProp, Some(ByteUnit.BYTE))}"
       }
@@ -1259,7 +1296,7 @@ abstract class AutoTuner(
     shufflePartitions
   }
 
-  /**
+    /**
    * Get the total shuffle write bytes across all stages in the application.
    * This is used to calculate the average shuffle partition size.
    *
@@ -1274,6 +1311,33 @@ abstract class AutoTuner(
       case _ =>
         // Fallback for other providers - return 0 to disable the heuristic
         0L
+    }
+  }
+
+  /**
+   * Get scan stages that have spilling detected.
+   * A scan stage is identified by having positive inputBytesReadSum (reading from data source).
+   * Spilling is detected by having positive diskBytesSpilledSum or memoryBytesSpilledSum.
+   *
+   * @return set of stage IDs that are scan stages with spilling
+   */
+  private def getScanStagesWithSpilling(): Set[Long] = {
+    appInfoProvider match {
+      case profilingProvider: SingleAppSummaryInfoProvider =>
+        profilingProvider.app.stageAggMetrics.collect {
+          case stage if stage.inputBytesReadSum > 0 &&
+            (stage.diskBytesSpilledSum > 0 || stage.memoryBytesSpilledSum > 0) =>
+            stage.id
+        }.toSet
+      case qualProvider: QualAppSummaryInfoProvider =>
+        qualProvider.rawAggMetrics.stageAggs.collect {
+          case stage if stage.inputBytesReadSum > 0 &&
+            (stage.diskBytesSpilledSum > 0 || stage.memoryBytesSpilledSum > 0) =>
+            stage.id
+        }.toSet
+      case _ =>
+        // Fallback for other providers - return empty set to disable the heuristic
+        Set.empty[Long]
     }
   }
 

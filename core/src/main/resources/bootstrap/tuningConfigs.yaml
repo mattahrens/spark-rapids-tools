@@ -141,6 +141,12 @@ default:
     default: 2
     usedBy: spark.sql.shuffle.partitions
 
+  - name: MAX_PARTITION_BYTES_MULTIPLIER
+    description: >-
+      Multiplier used to decrease maxPartitionBytes when spilling is detected in scan stages
+    default: 2
+    usedBy: spark.sql.files.maxPartitionBytes
+
   - name: WORKER_GPU_COUNT
     description: >-
       Default number of GPUs per worker node
