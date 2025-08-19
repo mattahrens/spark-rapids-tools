@@ -1222,6 +1222,7 @@ abstract class AutoTuner(
     var shufflePartitions = inputShufflePartitions
     val lookup = "spark.sql.shuffle.partitions"
     val shuffleStagesWithPosSpilling = appInfoProvider.getShuffleStagesWithPosSpilling
+
     if (shuffleStagesWithPosSpilling.nonEmpty) {
       val shuffleSkewStages = appInfoProvider.getShuffleSkewStages
       if (shuffleSkewStages.exists(id => shuffleStagesWithPosSpilling.contains(id))) {
@@ -1236,8 +1237,44 @@ abstract class AutoTuner(
         appendOptionalComment(lookup,
           s"'$lookup' should be increased since spilling occurred in shuffle stages.")
       }
+    } else {
+      // No spilling detected - check if we should decrease shuffle partitions
+      // based on average shuffle partition size
+      val totalShuffleBytes = getTotalShuffleWriteBytes()
+      if (totalShuffleBytes > 0) {
+        val avgShufflePartitionSize = totalShuffleBytes.toDouble / inputShufflePartitions
+        val fourGBInBytes = 4L * 1024 * 1024 * 1024 // 4 GB in bytes
+
+        if (avgShufflePartitionSize < fourGBInBytes) {
+          val multiplier = tuningConfigs.getEntry("SHUFFLE_PARTITION_MULTIPLIER").getDefault.toInt
+          shufflePartitions = Math.max(200, shufflePartitions / multiplier)
+          val avgPartitionSizeFormatted =
+            StringUtils.convertBytesToLargestUnit(avgShufflePartitionSize.toLong)
+          appendOptionalComment(lookup,
+            s"'$lookup' was decreased since no spilling occurred and average shuffle " +
+              s"partition size ($avgPartitionSizeFormatted) is less than 4GB.")
+        }
+      }
     }
     shufflePartitions
+  }
+
+  /**
+   * Get the total shuffle write bytes across all stages in the application.
+   * This is used to calculate the average shuffle partition size.
+   *
+   * @return total shuffle write bytes, or 0 if no shuffle data is available
+   */
+  private def getTotalShuffleWriteBytes(): Long = {
+    appInfoProvider match {
+      case profilingProvider: SingleAppSummaryInfoProvider =>
+        profilingProvider.app.stageAggMetrics.map(_.swBytesWrittenSum).sum
+      case qualProvider: QualAppSummaryInfoProvider =>
+        qualProvider.rawAggMetrics.stageAggs.map(_.swBytesWrittenSum).sum
+      case _ =>
+        // Fallback for other providers - return 0 to disable the heuristic
+        0L
+    }
   }
 
   /**
