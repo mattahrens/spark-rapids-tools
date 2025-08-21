@@ -1157,11 +1157,58 @@ abstract class AutoTuner(
     // Get the upper bound for the max partition bytes
     val maxAllowedPartitionBytesMB =
       tuningConfigs.getEntry("MAX_PARTITION_BYTES").getMaxAsMemory(ByteUnit.MiB)
+    logInfo(s"!!!!Here we are")
+
+    // Check 90th percentile reduction ratio first - this takes highest priority
+    calculate90thPercentileReductionRatio() match {
+      case Some(reductionRatio) =>
+        logInfo(s"!!!!90th percentile reduction ratio: $reductionRatio")
+
+        if (reductionRatio < 0.5) {
+          // Very low reduction ratio - set to 256MB
+          logInfo(s"!!!!Very low reduction ratio ($reductionRatio < 0.5), " +
+            s"setting maxPartitionBytes to 256MB")
+          return Some(256)
+        } else if (reductionRatio < 1.0) {
+          // Low reduction ratio - set to 512MB
+          logInfo(s"!!!!Low reduction ratio ($reductionRatio between 0.5 and 1.0), " +
+            s"setting maxPartitionBytes to 512MB")
+          return Some(512)
+        } else if (reductionRatio < 10.0) {
+          // Moderate reduction ratio - set to 1GB
+          logInfo(s"!!!!Moderate reduction ratio ($reductionRatio between 1.0 and 10.0), " +
+            s"setting maxPartitionBytes to 1GB")
+          return Some(1024)
+        } else if (reductionRatio < 100.0) {
+          // High reduction ratio - set to 2GB
+          logInfo(s"!!!!High reduction ratio ($reductionRatio between 10.0 and 100.0), " +
+            s"setting maxPartitionBytes to 2GB")
+          return Some(2048)
+        } else {
+          // Very high reduction ratio - set to 4GB
+          logInfo(s"!!!!Very high reduction ratio ($reductionRatio >= 100.0), " +
+            s"setting maxPartitionBytes to 4GB")
+          return Some(4096)
+        }
+      case None =>
+        logInfo(s"!!!!No valid reduction ratio found, continuing with other logic")
+    }
 
     if (actualTaskInputSizeMB == 0.0) {
       Some(currentMaxPartitionBytesMB)
     } else {
-      if (actualTaskInputSizeMB > 0 && actualTaskInputSizeMB < minTaskInputSizeThresholdMB) {
+      // Check if scan stages have spilling first - this takes priority
+      val scanStagesWithSpilling = getScanStagesWithSpilling()
+      if (scanStagesWithSpilling.nonEmpty) {
+        logInfo(s"!!!!Confirmed that we have scanStagesWithSpilling: $scanStagesWithSpilling")
+        val multiplier = tuningConfigs.getEntry("MAX_PARTITION_BYTES_MULTIPLIER").getDefault.toInt
+        val reducedPartitionBytesMB = Math.max(
+          currentMaxPartitionBytesMB / multiplier,
+          minTaskInputSizeThresholdMB) // Use same minimum as task input size threshold (128MB)
+        logInfo(s"!!!!Reduced partition bytes MB: $reducedPartitionBytesMB")
+        Some(reducedPartitionBytesMB)
+      } else if (actualTaskInputSizeMB > 0 && actualTaskInputSizeMB < minTaskInputSizeThresholdMB) {
+        logInfo(s"!!!!Confirmed that we don't have scanStagesWithSpilling: $scanStagesWithSpilling")
         // If task input too small (< min threshold): increase partition size to get bigger tasks
         val recommendedMaxPartitionBytesMB = Math.min(
           currentMaxPartitionBytesMB * (minTaskInputSizeThresholdMB / actualTaskInputSizeMB),
@@ -1174,18 +1221,8 @@ abstract class AutoTuner(
           maxAllowedPartitionBytesMB)
         Some(recommendedMaxPartitionBytesMB.toLong)
       } else {
-        // If task input within range: check if scan stages have spilling
-        val scanStagesWithSpilling = getScanStagesWithSpilling()
-        if (scanStagesWithSpilling.nonEmpty) {
-          val multiplier = tuningConfigs.getEntry("MAX_PARTITION_BYTES_MULTIPLIER").getDefault.toInt
-          val reducedPartitionBytesMB = Math.max(
-            currentMaxPartitionBytesMB / multiplier,
-            minTaskInputSizeThresholdMB) // Use same minimum as task input size threshold (128MB)
-          Some(reducedPartitionBytesMB)
-        } else {
-          // No adjustment needed
-          None
-        }
+        // Task input within range and no spilling - no adjustment needed
+        None
       }
     }
   }
@@ -1311,6 +1348,94 @@ abstract class AutoTuner(
       case _ =>
         // Fallback for other providers - return 0 to disable the heuristic
         0L
+    }
+  }
+
+  /**
+   * Calculate the 90th percentile reduction ratio for tasks in scan stages.
+   * Reduction ratio = inputBytesRead / shuffleWriteBytes per task.
+   * Only considers tasks from scan stages (stages with positive inputBytesReadSum).
+   *
+   * @return 90th percentile reduction ratio, or None if insufficient data
+   */
+  private def calculate90thPercentileReductionRatio(): Option[Double] = {
+    appInfoProvider match {
+      case profilingProvider: SingleAppSummaryInfoProvider =>
+        // Get scan stage IDs (stages with input bytes read > 0)
+        val scanStageIds = profilingProvider.app.stageAggMetrics
+          .filter(_.inputBytesReadSum > 0)
+          .map(_.id)
+          .toSet
+
+        if (scanStageIds.isEmpty) {
+          logInfo(s"!!!!No scan stages found")
+          return None
+        }
+
+        // Get all tasks from scan stages and calculate reduction ratios
+        val reductionRatios = scanStageIds.flatMap { stageId =>
+          val tasks = profilingProvider.appInfo.taskManager.getAllTasksStageAttempt(stageId.toInt)
+          tasks.filter(task => task.input_bytesRead > 0 && task.sw_bytesWritten > 0)
+            .map { task =>
+              val ratio = task.input_bytesRead.toDouble / task.sw_bytesWritten.toDouble
+              logInfo(s"!!!!Task ${task.taskId} in stage $stageId: " +
+                s"ratio=$ratio (input=${task.input_bytesRead}, shuffle=${task.sw_bytesWritten})")
+              ratio
+            }
+        }.toSeq
+
+        if (reductionRatios.isEmpty) {
+          logInfo(s"!!!!No valid reduction ratios found in scan stages")
+          None
+        } else {
+          val sortedRatios = reductionRatios.sorted
+          val percentile90Index = Math.min(
+            (sortedRatios.length * 0.9).toInt,
+            sortedRatios.length - 1)
+          val percentile90 = sortedRatios(percentile90Index)
+          logInfo(s"!!!!Found ${reductionRatios.length} reduction ratios, " +
+            s"90th percentile: $percentile90")
+          Some(percentile90)
+        }
+
+      case qualProvider: QualAppSummaryInfoProvider =>
+        // QualAppSummaryInfoProvider doesn't have task-level data,
+        // but we can estimate using stage-level aggregated data
+        val scanStages = qualProvider.rawAggMetrics.stageAggs
+          .filter(_.inputBytesReadSum > 0)
+
+        if (scanStages.isEmpty) {
+          logInfo(s"!!!!No scan stages found in qualification data")
+          None
+        } else {
+          // Calculate reduction ratios at stage level for scan stages
+          val stageReductionRatios = scanStages
+            .filter(stage => stage.inputBytesReadSum > 0 && stage.swBytesWrittenSum > 0)
+            .map { stage =>
+              val ratio = stage.inputBytesReadSum.toDouble / stage.swBytesWrittenSum.toDouble
+              logInfo(s"!!!!Stage ${stage.id}: ratio=$ratio " +
+                s"(input=${stage.inputBytesReadSum}, shuffle=${stage.swBytesWrittenSum})")
+              ratio
+            }
+
+          if (stageReductionRatios.isEmpty) {
+            logInfo(s"!!!!No valid stage-level reduction ratios found")
+            None
+          } else {
+            val sortedRatios = stageReductionRatios.sorted
+            val percentile90Index = Math.min(
+              (sortedRatios.length * 0.9).toInt,
+              sortedRatios.length - 1)
+            val percentile90 = sortedRatios(percentile90Index)
+            logInfo(s"!!!!Found ${stageReductionRatios.length} stage-level reduction ratios, " +
+              s"90th percentile: $percentile90")
+            Some(percentile90)
+          }
+        }
+
+      case _ =>
+        logInfo(s"!!!!Unsupported provider type for reduction ratio calculation")
+        None
     }
   }
 
