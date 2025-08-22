@@ -1399,35 +1399,39 @@ abstract class AutoTuner(
         }
 
       case qualProvider: QualAppSummaryInfoProvider =>
-        // QualAppSummaryInfoProvider doesn't have task-level data,
-        // but we can estimate using stage-level aggregated data
-        val scanStages = qualProvider.rawAggMetrics.stageAggs
+        // QualificationAppInfo extends AppBase and has access to taskManager
+        // Get scan stage IDs (stages with input bytes read > 0)
+        val scanStageIds = qualProvider.rawAggMetrics.stageAggs
           .filter(_.inputBytesReadSum > 0)
+          .map(_.id)
+          .toSet
 
-        if (scanStages.isEmpty) {
+        if (scanStageIds.isEmpty) {
           logInfo(s"!!!!No scan stages found in qualification data")
           None
         } else {
-          // Calculate reduction ratios at stage level for scan stages
-          val stageReductionRatios = scanStages
-            .filter(stage => stage.inputBytesReadSum > 0 && stage.swBytesWrittenSum > 0)
-            .map { stage =>
-              val ratio = stage.inputBytesReadSum.toDouble / stage.swBytesWrittenSum.toDouble
-              logInfo(s"!!!!Stage ${stage.id}: ratio=$ratio " +
-                s"(input=${stage.inputBytesReadSum}, shuffle=${stage.swBytesWrittenSum})")
-              ratio
-            }
+          // Get all tasks from scan stages and calculate reduction ratios
+          val reductionRatios = scanStageIds.flatMap { stageId =>
+            val tasks = qualProvider.appInfo.taskManager.getAllTasksStageAttempt(stageId.toInt)
+            tasks.filter(task => task.input_bytesRead > 0 && task.sw_bytesWritten > 0)
+              .map { task =>
+                val ratio = task.input_bytesRead.toDouble / task.sw_bytesWritten.toDouble
+                logInfo(s"!!!!Task ${task.taskId} in stage $stageId: " +
+                  s"ratio=$ratio (input=${task.input_bytesRead}, shuffle=${task.sw_bytesWritten})")
+                ratio
+              }
+          }.toSeq
 
-          if (stageReductionRatios.isEmpty) {
-            logInfo(s"!!!!No valid stage-level reduction ratios found")
+          if (reductionRatios.isEmpty) {
+            logInfo(s"!!!!No valid task-level reduction ratios found in qualification data")
             None
           } else {
-            val sortedRatios = stageReductionRatios.sorted
+            val sortedRatios = reductionRatios.sorted
             val percentile90Index = Math.min(
               (sortedRatios.length * 0.9).toInt,
               sortedRatios.length - 1)
             val percentile90 = sortedRatios(percentile90Index)
-            logInfo(s"!!!!Found ${stageReductionRatios.length} stage-level reduction ratios, " +
+            logInfo(s"!!!!Found ${reductionRatios.length} task-level reduction ratios, " +
               s"90th percentile: $percentile90")
             Some(percentile90)
           }
