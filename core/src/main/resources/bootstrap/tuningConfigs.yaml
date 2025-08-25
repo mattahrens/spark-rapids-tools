@@ -294,6 +294,34 @@ default:
     default: 0g
     usedBy: spark.executor.memoryOverhead, spark.rapids.memory.host.offHeapLimit.size
 
+  - name: MIN_REDUCTION_RATIO
+    description: >-
+      Minimum reduction ratio value used in formulaic calculation of maxPartitionBytes.
+      Calculated reduction ratios below this value will be clamped to this minimum.
+    default: 0.1
+    usedBy: spark.sql.files.maxPartitionBytes
+
+  - name: MAX_REDUCTION_RATIO
+    description: >-
+      Maximum reduction ratio value used in formulaic calculation of maxPartitionBytes.
+      Calculated reduction ratios above this value will be clamped to this maximum.
+    default: 10000
+    usedBy: spark.sql.files.maxPartitionBytes
+
+  - name: MIN_MAXPARTITIONBYTES_MB
+    description: >-
+      Minimum maxPartitionBytes value in MB used in formulaic calculation.
+      This represents the lower bound of the calculated maxPartitionBytes range.
+    default: 128
+    usedBy: spark.sql.files.maxPartitionBytes
+
+  - name: MAX_MAXPARTITIONBYTES_MB
+    description: >-
+      Maximum maxPartitionBytes value in MB used in formulaic calculation.
+      This represents the upper bound of the calculated maxPartitionBytes range.
+    default: 4096
+    usedBy: spark.sql.files.maxPartitionBytes
+
 
 # Qualification tool specific tuning configs
 qualification:

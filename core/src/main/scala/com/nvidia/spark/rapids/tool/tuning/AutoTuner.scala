@@ -1161,35 +1161,45 @@ abstract class AutoTuner(
 
     // Check 90th percentile reduction ratio first - this takes highest priority
     calculate90thPercentileReductionRatio() match {
-      case Some(reductionRatio) =>
-        logInfo(s"!!!!90th percentile reduction ratio: $reductionRatio")
+      case Some(calculatedReductionRatio) =>
+        logInfo(s"!!!!90th percentile reduction ratio: $calculatedReductionRatio")
 
-        if (reductionRatio < 0.5) {
-          // Very low reduction ratio - set to 256MB
-          logInfo(s"!!!!Very low reduction ratio ($reductionRatio < 0.5), " +
-            s"setting maxPartitionBytes to 256MB")
-          return Some(256)
-        } else if (reductionRatio < 1.0) {
-          // Low reduction ratio - set to 512MB
-          logInfo(s"!!!!Low reduction ratio ($reductionRatio between 0.5 and 1.0), " +
-            s"setting maxPartitionBytes to 512MB")
-          return Some(512)
-        } else if (reductionRatio < 10.0) {
-          // Moderate reduction ratio - set to 1GB
-          logInfo(s"!!!!Moderate reduction ratio ($reductionRatio between 1.0 and 10.0), " +
-            s"setting maxPartitionBytes to 1GB")
-          return Some(1024)
-        } else if (reductionRatio < 100.0) {
-          // High reduction ratio - set to 2GB
-          logInfo(s"!!!!High reduction ratio ($reductionRatio between 10.0 and 100.0), " +
-            s"setting maxPartitionBytes to 2GB")
-          return Some(2048)
-        } else {
-          // Very high reduction ratio - set to 4GB
-          logInfo(s"!!!!Very high reduction ratio ($reductionRatio >= 100.0), " +
-            s"setting maxPartitionBytes to 4GB")
-          return Some(4096)
-        }
+        // Get configuration values for formulaic calculation
+        val minReductionRatio = tuningConfigs.getEntry("MIN_REDUCTION_RATIO").getDefault.toDouble
+        val maxReductionRatio = tuningConfigs.getEntry("MAX_REDUCTION_RATIO").getDefault.toDouble
+        val minMaxPartitionBytesMB =
+          tuningConfigs.getEntry("MIN_MAXPARTITIONBYTES_MB").getDefault.toLong
+        val maxMaxPartitionBytesMB =
+          tuningConfigs.getEntry("MAX_MAXPARTITIONBYTES_MB").getDefault.toLong
+
+        // Clamp the calculated reduction ratio to the configured range
+        val clampedReductionRatio = Math.max(minReductionRatio,
+          Math.min(maxReductionRatio, calculatedReductionRatio))
+
+        logInfo(s"!!!!Clamped reduction ratio: $clampedReductionRatio " +
+          s"(min: $minReductionRatio, max: $maxReductionRatio)")
+
+        // Calculate maxPartitionBytes using the formula:
+        // value = MIN_MAXPARTITIONBYTES_MB +
+        //         ((log(clampedReductionRatio) - log(MIN_REDUCTION_RATIO)) /
+        //          (log(MAX_REDUCTION_RATIO) - log(MIN_REDUCTION_RATIO))) *
+        //         (MAX_MAXPARTITIONBYTES_MB - MIN_MAXPARTITIONBYTES_MB)
+        val logClampedRatio = Math.log(clampedReductionRatio)
+        val logMinRatio = Math.log(minReductionRatio)
+        val logMaxRatio = Math.log(maxReductionRatio)
+
+        val normalizedPosition = (logClampedRatio - logMinRatio) / (logMaxRatio - logMinRatio)
+        val calculatedMaxPartitionBytesMB = minMaxPartitionBytesMB +
+          (normalizedPosition * (maxMaxPartitionBytesMB - minMaxPartitionBytesMB))
+
+        // Round to nearest MB
+        val finalMaxPartitionBytesMB = Math.round(calculatedMaxPartitionBytesMB)
+
+        logInfo(s"!!!!Formulaic calculation: normalizedPosition=$normalizedPosition, " +
+          s"calculatedMaxPartitionBytesMB=$calculatedMaxPartitionBytesMB, " +
+          s"finalMaxPartitionBytesMB=${finalMaxPartitionBytesMB}MB")
+
+        return Some(finalMaxPartitionBytesMB)
       case None =>
         logInfo(s"!!!!No valid reduction ratio found, continuing with other logic")
     }
