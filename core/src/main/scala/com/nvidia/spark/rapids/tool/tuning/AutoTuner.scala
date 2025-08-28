@@ -1321,7 +1321,8 @@ abstract class AutoTuner(
         appendOptionalComment(lookup,
           s"'$lookup' should be increased since spilling occurred in shuffle stages.")
       }
-    } else {
+    }
+    /* else {
       // No spilling detected - check if we should decrease shuffle partitions
       // based on average shuffle partition size
       val totalShuffleBytes = getTotalShuffleWriteBytes()
@@ -1339,7 +1340,7 @@ abstract class AutoTuner(
               s"partition size ($avgPartitionSizeFormatted) is less than 4GB.")
         }
       }
-    }
+    } */
     shufflePartitions
   }
 
@@ -1349,7 +1350,7 @@ abstract class AutoTuner(
    *
    * @return total shuffle write bytes, or 0 if no shuffle data is available
    */
-  private def getTotalShuffleWriteBytes(): Long = {
+   /* private def getTotalShuffleWriteBytes(): Long = {
     appInfoProvider match {
       case profilingProvider: SingleAppSummaryInfoProvider =>
         profilingProvider.app.stageAggMetrics.map(_.swBytesWrittenSum).sum
@@ -1359,7 +1360,7 @@ abstract class AutoTuner(
         // Fallback for other providers - return 0 to disable the heuristic
         0L
     }
-  }
+  } */
 
   /**
    * Calculate the 90th percentile reduction ratio for tasks in scan stages.
