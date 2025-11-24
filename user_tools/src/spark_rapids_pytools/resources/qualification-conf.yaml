@@ -322,6 +322,52 @@ local:
               lowerBound: !ENV ${RAPIDS_USER_TOOLS_UNSUPPORTED_OPERATORS_PHOTON_LOWER_BOUND:0.0}
               upperBound: !ENV ${RAPIDS_USER_TOOLS_UNSUPPORTED_OPERATORS_PHOTON_UPPER_BOUND:25.0}
               skippingReason: 'Unsupported Operators Stage Duration Percent > Qualifying Threshold (Less is qualified)'
+        auron:  # Auron specific speedup categories
+          categories:
+            - title: 'Not Applicable'
+              lowerBound: -1000000.0
+              upperBound: 1.3
+            - title: 'Small'
+              lowerBound: 1.3
+              upperBound: 2.0
+            - title: 'Medium'
+              lowerBound: 2.0
+              upperBound: 3.0
+            - title: 'Large'
+              lowerBound: 3.0
+              upperBound: 1000000.0
+          eligibilityConditions:
+            - columnName: 'Estimated GPU Speedup'
+              lowerBound: !ENV ${RAPIDS_USER_TOOLS_GPU_SPEEDUP_AURON_LOWER_BOUND:1.3}
+              upperBound: !ENV ${RAPIDS_USER_TOOLS_GPU_SPEEDUP_AURON_UPPER_BOUND:1000000.0}
+              skippingReason: 'GPU SpeedUp < Qualifying Threshold (More is qualified)'
+            - columnName: 'Unsupported Operators Stage Duration Percent'
+              lowerBound: !ENV ${RAPIDS_USER_TOOLS_UNSUPPORTED_OPERATORS_AURON_LOWER_BOUND:0.0}
+              upperBound: !ENV ${RAPIDS_USER_TOOLS_UNSUPPORTED_OPERATORS_AURON_UPPER_BOUND:25.0}
+              skippingReason: 'Unsupported Operators Stage Duration Percent > Qualifying Threshold (Less is qualified)'
+        gluten:  # Gluten specific speedup categories
+          categories:
+            - title: 'Not Applicable'
+              lowerBound: -1000000.0
+              upperBound: 1.3
+            - title: 'Small'
+              lowerBound: 1.3
+              upperBound: 2.0
+            - title: 'Medium'
+              lowerBound: 2.0
+              upperBound: 3.0
+            - title: 'Large'
+              lowerBound: 3.0
+              upperBound: 1000000.0
+          eligibilityConditions:
+            - columnName: 'Estimated GPU Speedup'
+              lowerBound: !ENV ${RAPIDS_USER_TOOLS_GPU_SPEEDUP_GLUTEN_LOWER_BOUND:1.3}
+              upperBound: !ENV ${RAPIDS_USER_TOOLS_GPU_SPEEDUP_GLUTEN_UPPER_BOUND:1000000.0}
+              skippingReason: 'GPU SpeedUp < Qualifying Threshold (More is qualified)'
+            - columnName: 'Unsupported Operators Stage Duration Percent'
+              lowerBound: !ENV ${RAPIDS_USER_TOOLS_UNSUPPORTED_OPERATORS_GLUTEN_LOWER_BOUND:0.0}
+              upperBound: !ENV ${RAPIDS_USER_TOOLS_UNSUPPORTED_OPERATORS_GLUTEN_UPPER_BOUND:25.0}
+              skippingReason: 'Unsupported Operators Stage Duration Percent > Qualifying Threshold (Less is qualified)'
     additionalHeuristics:
       appInfo:
         fileName: 'application_information.csv'

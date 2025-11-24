@@ -23,7 +23,9 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 import scala.util.matching.Regex
 
+import com.nvidia.spark.rapids.tool.planparser.auron.{AuronPlanParser, AuronStageExecParser}
 import com.nvidia.spark.rapids.tool.planparser.delta.DeltaLakeOps
+import com.nvidia.spark.rapids.tool.planparser.gluten.{GlutenPlanParser, GlutenStageExecParser}
 import com.nvidia.spark.rapids.tool.planparser.iceberg.IcebergWriteOps
 import com.nvidia.spark.rapids.tool.planparser.ops.{ExprOpRef, OperatorRefTrait, OpRef, UnsupportedExprOpRef}
 import com.nvidia.spark.rapids.tool.planparser.photon.{PhotonPlanParser, PhotonStageExecParser}
@@ -34,7 +36,7 @@ import org.apache.spark.sql.execution.SparkPlanInfo
 import org.apache.spark.sql.execution.ui.{SparkPlanGraph, SparkPlanGraphCluster, SparkPlanGraphNode}
 import org.apache.spark.sql.rapids.tool.{AppBase, BuildSide, ExecHelper, JoinType, RDDCheckHelper, ToolUtils}
 import org.apache.spark.sql.rapids.tool.util.ToolsPlanGraph
-import org.apache.spark.sql.rapids.tool.util.plangraph.{PhotonSparkPlanGraphCluster, PhotonSparkPlanGraphNode}
+import org.apache.spark.sql.rapids.tool.util.plangraph.{AuronSparkPlanGraphCluster, AuronSparkPlanGraphNode, GlutenSparkPlanGraphCluster, GlutenSparkPlanGraphNode, PhotonSparkPlanGraphCluster, PhotonSparkPlanGraphNode}
 
 
 object OpActions extends Enumeration {
@@ -563,7 +565,25 @@ object SQLPlanParser extends Logging {
       sqlID: Long,
       checker: PluginTypeChecker,
       app: AppBase): ExecInfo = {
-    val normalizedNodeName = node.name.stripSuffix("$")
+    // If the node wasn't recognized as Gluten during transformation, check again here
+    // and transform it if it matches Gluten patterns. This is a fallback to ensure Gluten
+    // operators are always mapped correctly.
+    val nodeToUse: SparkPlanGraphNode = if (!node.isInstanceOf[GlutenSparkPlanGraphNode] &&
+        GlutenParseHelper.isGlutenNode(node.name)) {
+      // Node wasn't transformed but matches Gluten patterns - transform it now
+      logInfo(s"[GLUTEN-DEBUG] parseSparkNode: Fallback transformation for node: " +
+        s"'${node.name}' (sqlID: $sqlID, nodeId: ${node.id})")
+      val transformed = GlutenSparkPlanGraphNode.from(node)
+      logInfo(s"[GLUTEN-DEBUG] parseSparkNode: Transformed '${node.name}' -> " +
+        s"'${transformed.name}'")
+      transformed
+    } else {
+      if (node.isInstanceOf[GlutenSparkPlanGraphNode]) {
+        logDebug(s"[GLUTEN-DEBUG] parseSparkNode: Node already transformed: '${node.name}'")
+      }
+      node
+    }
+    val normalizedNodeName = nodeToUse.name.stripSuffix("$")
     normalizedNodeName match {
       // Generalize all the execs that call GenericExecParser in one case
       case "AggregateInPandas" | "ArrowEvalPython" | "AQEShuffleRead" | "CartesianProduct"
@@ -571,79 +591,95 @@ object SQLPlanParser extends Logging {
            | "GlobalLimit" | "LocalLimit" | "InMemoryTableScan" | "MapInPandas"
            | "PythonMapInArrow" | "MapInArrow" | "Range" | "RunningWindowFunction"
            | "Sample" | "Union" | "WindowInPandas" =>
-        GenericExecParser(node, checker, sqlID, app = Some(app)).parse
+        GenericExecParser(nodeToUse, checker, sqlID, app = Some(app)).parse
       case "BatchScan" =>
-        BatchScanExecParser(node, checker, sqlID, app).parse
+        BatchScanExecParser(nodeToUse, checker, sqlID, app).parse
       case "BroadcastExchange" =>
-        BroadcastExchangeExecParser(node, checker, sqlID, app).parse
+        BroadcastExchangeExecParser(nodeToUse, checker, sqlID, app).parse
       case "BroadcastHashJoin" =>
-        BroadcastHashJoinExecParser(node, checker, sqlID).parse
+        BroadcastHashJoinExecParser(nodeToUse, checker, sqlID).parse
       case "BroadcastNestedLoopJoin" =>
-        BroadcastNestedLoopJoinExecParser(node, checker, sqlID).parse
+        BroadcastNestedLoopJoinExecParser(nodeToUse, checker, sqlID).parse
       case "Exchange" =>
-        ShuffleExchangeExecParser(node, checker, sqlID, app).parse
+        ShuffleExchangeExecParser(nodeToUse, checker, sqlID, app).parse
       case "Expand" =>
         GenericExecParser(
-          node, checker, sqlID, expressionFunction = Some(parseExpandExpressions)).parse
+          nodeToUse, checker, sqlID, expressionFunction = Some(parseExpandExpressions)).parse
       case "Filter" =>
         GenericExecParser(
-          node, checker, sqlID, expressionFunction = Some(parseFilterExpressions)).parse
+          nodeToUse, checker, sqlID, expressionFunction = Some(parseFilterExpressions)).parse
       case "Generate" =>
         GenericExecParser(
-          node, checker, sqlID, expressionFunction = Some(parseGenerateExpressions)).parse
+          nodeToUse, checker, sqlID, expressionFunction = Some(parseGenerateExpressions)).parse
       case "HashAggregate" =>
         HashAggregateExecParser(
-          node, checker, sqlID, Some(parseAggregateExpressions), app).parse
+          nodeToUse, checker, sqlID, Some(parseAggregateExpressions), app).parse
       case "ObjectHashAggregate" =>
         ObjectHashAggregateExecParser(
-          node, checker, sqlID, Some(parseAggregateExpressions), app).parse
+          nodeToUse, checker, sqlID, Some(parseAggregateExpressions), app).parse
       case "Project" =>
         GenericExecParser(
-          node, checker, sqlID, expressionFunction = Some(parseProjectExpressions)).parse
+          nodeToUse, checker, sqlID, expressionFunction = Some(parseProjectExpressions)).parse
       case "ShuffledHashJoin" =>
-        ShuffledHashJoinExecParser(node, checker, sqlID, app).parse
+        ShuffledHashJoinExecParser(nodeToUse, checker, sqlID, app).parse
       case "Sort" =>
         GenericExecParser(
-          node, checker, sqlID, expressionFunction = Some(parseSortExpressions)).parse
+          nodeToUse, checker, sqlID, expressionFunction = Some(parseSortExpressions)).parse
       case s if FileSourceScanExecParser.accepts(s) =>
         // Scan operation
-        FileSourceScanExecParser.createExecParser(node, checker, sqlID, app = Option(app)).parse
+        FileSourceScanExecParser.createExecParser(
+          nodeToUse, checker, sqlID, app = Option(app)).parse
       case "SortAggregate" =>
         GenericExecParser(
-          node, checker, sqlID, expressionFunction = Some(parseAggregateExpressions)).parse
+          nodeToUse, checker, sqlID, expressionFunction = Some(parseAggregateExpressions)).parse
       case smj if SortMergeJoinExecParser.accepts(smj) =>
-        SortMergeJoinExecParser(node, checker, sqlID).parse
+        SortMergeJoinExecParser(nodeToUse, checker, sqlID).parse
       case "SubqueryBroadcast" =>
-        SubqueryBroadcastExecParser(node, checker, sqlID, app).parse
+        SubqueryBroadcastExecParser(nodeToUse, checker, sqlID, app).parse
       case sqe if SubqueryExecParser.accepts(sqe) =>
-        SubqueryExecParser.createExecParser(node, checker, sqlID, app = Option(app)).parse
-      case "TakeOrderedAndProject" =>
+        SubqueryExecParser.createExecParser(nodeToUse, checker, sqlID, app = Option(app)).parse
+      case "TakeOrderedAndProject" | "TakeOrderedAndProjectExec" =>
         GenericExecParser(
-          node, checker, sqlID, expressionFunction = Some(parseTakeOrderedExpressions)).parse
+          nodeToUse, checker, sqlID, Some("TakeOrderedAndProjectExec"),
+          Some(parseTakeOrderedExpressions), Some(app), ignoreExpressionChecks = true).parse
       case "Window" =>
         GenericExecParser(
-          node, checker, sqlID, expressionFunction = Some(parseWindowExpressions)).parse
+          nodeToUse, checker, sqlID, expressionFunction = Some(parseWindowExpressions)).parse
       case "WindowGroupLimit" =>
-        WindowGroupLimitParser(node, checker, sqlID).parse
+        WindowGroupLimitParser(nodeToUse, checker, sqlID).parse
       case iwo if IcebergWriteOps.accepts(iwo, Some(app)) =>
         // Iceberg write ops such as AppendDataExec
         IcebergWriteOps.createExecParser(
-          node = node, checker = checker, sqlID = sqlID, app = Some(app)).parse
+          node = nodeToUse, checker = checker, sqlID = sqlID, app = Some(app)).parse
       case i if DataWritingCommandExecParser.isWritingCmdExec(i) =>
-        DataWritingCommandExecParser.parseNode(node, checker, sqlID)
+        DataWritingCommandExecParser.parseNode(nodeToUse, checker, sqlID)
       case wfe if SupportedBlankExec.accepts(wfe) =>
         SupportedBlankExec.createExecParser(
-          node = node, checker = checker, sqlID = sqlID, app = Some(app)).parse
-      case dlo if DeltaLakeOps.accepts(dlo) =>
+          node = nodeToUse, checker = checker, sqlID = sqlID, app = Some(app)).parse
+      case dlo if DeltaLakeOps.accepts(dlo, Some(app)) =>
         // Delta Lake ops such as DeltaScan, DeltaMerge, etc.
         DeltaLakeOps.createExecParser(
-          node = node, checker = checker, sqlID = sqlID, app = Some(app)).parse
+          node = nodeToUse, checker = checker, sqlID = sqlID, app = Some(app)).parse
       case _ =>
         // Execs that are members of reuseExecs (i.e., ReusedExchange) should be marked as
         // supported but with shouldRemove flag set to True.
         // Setting the "shouldRemove" is handled at the end of the function.
-        ExecInfo(node, sqlID, normalizedNodeName, expr = "", 1, duration = None, node.id,
-          isSupported = reuseExecs.contains(normalizedNodeName), children = None,
+        if (normalizedNodeName.contains("ColumnarToRow")) {
+          logInfo(s"[GLUTEN-DEBUG] parseSparkNode: Creating ExecInfo for ColumnarToRow " +
+            s"(normalizedNodeName: '$normalizedNodeName', sqlID: $sqlID, nodeId: ${nodeToUse.id})")
+        }
+        // Handle TakeOrderedAndProjectExec specially - it should be marked as supported
+        // regardless of expressions. TakeOrderedAndProjectExec is in supportedExecs.csv as "S"
+        val isSupported = if (normalizedNodeName == "TakeOrderedAndProjectExec" ||
+            normalizedNodeName == "TakeOrderedAndProject" ||
+            normalizedNodeName.contains("TakeOrderedAndProject")) {
+          // Always mark as supported - it's in supportedExecs.csv
+          true
+        } else {
+          reuseExecs.contains(normalizedNodeName)
+        }
+        ExecInfo(nodeToUse, sqlID, normalizedNodeName, expr = "", 1, duration = None, nodeToUse.id,
+          isSupported = isSupported, children = None,
           expressions = Seq.empty)
     }
   }
@@ -670,21 +706,31 @@ object SQLPlanParser extends Logging {
     }
 
     node match {
-      // For WholeStageCodegen clusters, use PhotonStageExecParser if the cluster is of Photon type.
-      // Else, fall back to WholeStageExecParser to parse the cluster.
+      // For WholeStageCodegen clusters, use specialized parsers if the cluster is of a
+      // specialized type. Else, fall back to WholeStageExecParser to parse the cluster.
       case photonCluster: PhotonSparkPlanGraphCluster =>
         PhotonStageExecParser(photonCluster, checker, sqlID, app, reusedNodeIds,
+          nodeIdToStagesFunc = nodeIdToStagesFunc).parse
+      case auronCluster: AuronSparkPlanGraphCluster =>
+        AuronStageExecParser(auronCluster, checker, sqlID, app, reusedNodeIds,
+          nodeIdToStagesFunc = nodeIdToStagesFunc).parse
+      case glutenCluster: GlutenSparkPlanGraphCluster =>
+        GlutenStageExecParser(glutenCluster, checker, sqlID, app, reusedNodeIds,
           nodeIdToStagesFunc = nodeIdToStagesFunc).parse
       case cluster: SparkPlanGraphCluster =>
         WholeStageExecParser(cluster, checker, sqlID, app, reusedNodeIds,
           nodeIdToStagesFunc = nodeIdToStagesFunc).parse
       case _ =>
-        // For individual nodes, use PhotonPlanParser if the node is of Photon type.
+        // For individual nodes, use specialized parsers if the node is of a specialized type.
         // Else, fall back to the Spark node parsing logic to parse the node.
         val execInfo = try {
           node match {
             case photonNode: PhotonSparkPlanGraphNode =>
               PhotonPlanParser.parseNode(photonNode, sqlID, checker, app)
+            case auronNode: AuronSparkPlanGraphNode =>
+              AuronPlanParser.parseNode(auronNode, sqlID, checker, app)
+            case glutenNode: GlutenSparkPlanGraphNode =>
+              GlutenPlanParser.parseNode(glutenNode, sqlID, checker, app)
             case _ =>
               parseSparkNode(node, sqlID, checker, app)
           }
@@ -706,8 +752,21 @@ object SQLPlanParser extends Logging {
         val stagesInNode = nodeIdToStagesFunc(node.id)
         execInfo.setStages(stagesInNode)
         // shouldRemove is set to true if the exec is a member of "execsToBeRemoved" or if the node
-        // is a duplicate
-        execInfo.setShouldRemove(isDupNode)
+        // is a duplicate. Also check ExecHelper.shouldBeRemoved here as a safeguard since
+        // some parsers create ExecInfo directly without going through createExecNoNode.
+        val shouldRemoveFlag = isDupNode || ExecHelper.shouldBeRemoved(execInfo.exec)
+        if (execInfo.exec.contains("ColumnarToRow")) {
+          logInfo(s"[GLUTEN-DEBUG] parsePlanNode: ColumnarToRow exec: '${execInfo.exec}', " +
+            s"shouldRemoveFlag: $shouldRemoveFlag, isDupNode: $isDupNode, " +
+            s"shouldBeRemoved: ${ExecHelper.shouldBeRemoved(execInfo.exec)}, " +
+            s"sqlID: $sqlID, nodeId: ${node.id}")
+        }
+        execInfo.setShouldRemove(shouldRemoveFlag)
+        // Ensure TakeOrderedAndProjectExec is always marked as supported
+        if (execInfo.exec == "TakeOrderedAndProjectExec" ||
+            execInfo.exec.contains("TakeOrderedAndProject")) {
+          execInfo.setSupportedFlag(true)
+        }
         // Set the custom reasons for unsupported execs
         if (!execInfo.isSupported && execInfo.unsupportedExecReason.isEmpty) {
           val unsupportedExecsReason = checker.getNotSupportedExecsReason(execInfo.exec)

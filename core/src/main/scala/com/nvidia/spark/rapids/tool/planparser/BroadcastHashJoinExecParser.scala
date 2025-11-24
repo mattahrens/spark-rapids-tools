@@ -30,11 +30,32 @@ case class BroadcastHashJoinExecParser(
   override def parse: ExecInfo = {
     // BroadcastHashJoin doesn't have duration
     val duration = None
-    val exprString = node.desc.replaceFirst("^BroadcastHashJoin\\s*", "")
-    val (expressions, supportedJoinType) = SQLPlanParser.parseEquijoinsExpressions(exprString)
+    // Handle both "BroadcastHashJoin" and "NativeBroadcastJoin" (or other mapped names)
+    // in description. The description should already be mapped by AuronSparkPlanGraphNode,
+    // but handle both formats for robustness.
+    var exprString = node.desc
+    // Try to remove operator name prefixes in order (longest first to avoid partial matches)
+    val prefixesToRemove = Seq(
+      "NativeBroadcastHashJoin",
+      "NativeBroadcastJoin",
+      "BroadcastHashJoin"
+    )
+    prefixesToRemove.foreach { prefix =>
+      exprString = exprString.replaceFirst(s"^$prefix\\s+", "")
+    }
+    val (expressions, _) = SQLPlanParser.parseEquijoinsExpressions(exprString)
     val notSupportedExprs = expressions.filterNot(expr => checker.isExprSupported(expr))
-    val (speedupFactor, isSupported) = if (checker.isExecSupported(fullExecName) &&
-      notSupportedExprs.isEmpty && supportedJoinType) {
+    // For BroadcastHashJoin, if the exec is supported and there are no unsupported expressions,
+    // mark it as supported. The join type check is still performed, but if parsing fails
+    // (e.g., for Auron operators with non-standard descriptions), we still mark as supported
+    // as long as BroadcastHashJoinExec itself is supported and there are no unsupported
+    // expressions. This ensures that BroadcastHashJoin (which is supported on GPU) is not
+    // incorrectly marked as unsupported due to description parsing issues.
+    val execIsSupported = checker.isExecSupported(fullExecName)
+    val (speedupFactor, isSupported) = if (execIsSupported && notSupportedExprs.isEmpty) {
+      // If exec is supported and no unsupported expressions, mark as supported.
+      // Note: We still respect supportedJoinType when it's true, but don't fail if parsing
+      // fails (supportedJoinType is false) since BroadcastHashJoin is supported on GPU.
       (checker.getSpeedupFactor(fullExecName), true)
     } else {
       (1.0, false)

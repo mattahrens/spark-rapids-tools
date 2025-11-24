@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 import scala.collection.mutable
 
-import com.nvidia.spark.rapids.tool.planparser.DatabricksParseHelper
+import com.nvidia.spark.rapids.tool.planparser.{AuronParseHelper, DatabricksParseHelper, GlutenParseHelper}
 
 import org.apache.spark.sql.execution.SparkPlanInfo
 import org.apache.spark.sql.execution.ui._
@@ -572,6 +572,10 @@ object ToolsPlanGraph {
       nodeName.replaceFirst("Gpu", "")
     } else if (DatabricksParseHelper.isPhotonNode(nodeName)) {
       DatabricksParseHelper.mapPhotonToSpark(nodeName)
+    } else if (AuronParseHelper.isAuronNode(nodeName)) {
+      AuronParseHelper.mapAuronToSpark(nodeName)
+    } else if (GlutenParseHelper.isGlutenNode(nodeName)) {
+      GlutenParseHelper.mapGlutenToSpark(nodeName)
     } else {
       nodeName
     }

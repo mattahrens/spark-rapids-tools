@@ -216,7 +216,17 @@ case class FileSourceScanExecParser(
       val duration = computeDuration
       val expressions = parseExpressions()
       val notSupportedExprs = getNotSupportedExprs(expressions)
-      val isExecSupported = pullSupportedFlag() && notSupportedExprs.isEmpty
+      // For Gluten apps, Scan parquet should be marked as supported since Gluten handles
+      // columnar execution and parquet is a columnar format
+      val isGlutenApp = app.exists { a =>
+        GlutenParseHelper.isGlutenApp(a.sparkProperties)
+      }
+      val isExecSupported = if (isGlutenApp && readFormat == "parquet") {
+        // For Gluten apps with parquet format, mark as supported
+        true
+      } else {
+        pullSupportedFlag() && notSupportedExprs.isEmpty
+      }
       createExecInfo(
         calculatedSpeedup,
         isExecSupported,

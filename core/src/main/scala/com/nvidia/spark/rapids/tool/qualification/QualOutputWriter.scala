@@ -1057,13 +1057,31 @@ object QualOutputWriter {
   def flattenedExecs(execs: Seq[ExecInfo]): Seq[ExecInfo] = {
     // need to remove the WholeStageCodegen wrappers since they aren't actual
     // execs that we want to get timings of
-    execs.flatMap { e =>
+    // Also filter out execs that should be removed (e.g., ColumnarToRow)
+    // Explicitly filter out ColumnarToRow as a safeguard
+    val columnarToRowBefore = execs.filter(_.exec.contains("ColumnarToRow"))
+    val result = execs.flatMap { e =>
       if (e.isClusterNode) {
-        e.children.getOrElse(Seq.empty)
+        e.children.getOrElse(Seq.empty).filterNot(c =>
+          c.shouldRemove || c.exec.contains("ColumnarToRow"))
       } else {
-        e.children.getOrElse(Seq.empty) :+ e
+        val filteredChildren = e.children.getOrElse(Seq.empty).filterNot(c =>
+          c.shouldRemove || c.exec.contains("ColumnarToRow"))
+        if (e.shouldRemove || e.exec.contains("ColumnarToRow")) {
+          filteredChildren
+        } else {
+          filteredChildren :+ e
+        }
       }
     }
+    val columnarToRowAfter = result.filter(_.exec.contains("ColumnarToRow"))
+    // scalastyle:off println
+    if (columnarToRowBefore.nonEmpty || columnarToRowAfter.nonEmpty) {
+      println(s"[FILTER-DEBUG] flattenedExecs: Before=${columnarToRowBefore.size} " +
+        s"ColumnarToRow execs, After=${columnarToRowAfter.size} ColumnarToRow execs")
+    }
+    // scalastyle:on println
+    result
   }
 
   def getDetailedMlFuncsHeaderStringsAndSizes(
@@ -1131,7 +1149,29 @@ object QualOutputWriter {
     sumInfo.planInfo.map(_.execInfo).collect {
       case execInfos =>
         val allExecs = flattenedExecs(execInfos)
-        allExecs.filter(exec => !exec.isSupported && exec.stages.contains(stageID))
+        val columnarToRowExecs = allExecs.filter(_.exec.contains("ColumnarToRow"))
+        // scalastyle:off println
+        if (columnarToRowExecs.nonEmpty) {
+          println(s"[FILTER-DEBUG] getUnsupportedExecsPerStage (stage $stageID): " +
+            s"Found ${columnarToRowExecs.size} ColumnarToRow execs after flattenedExecs, " +
+            s"shouldRemove flags: ${columnarToRowExecs.map(e => s"${e.exec}:${e.shouldRemove}")}")
+        }
+        // scalastyle:on println
+        // Filter out operators that should be removed (e.g., ColumnarToRow, ReusedExchange)
+        // Explicitly filter out ColumnarToRow and TakeOrderedAndProjectExec as a safeguard
+        val filteredExecs = allExecs.filter(exec =>
+          !exec.exec.contains("ColumnarToRow") &&
+          !exec.exec.contains("TakeOrderedAndProject") &&
+          !exec.isSupported && !exec.shouldRemove && exec.stages.contains(stageID))
+        val filteredColumnarToRow = filteredExecs.filter(_.exec.contains("ColumnarToRow"))
+        // scalastyle:off println
+        if (filteredColumnarToRow.nonEmpty) {
+          println(s"[FILTER-DEBUG] ERROR: getUnsupportedExecsPerStage (stage $stageID): " +
+            s"Found ${filteredColumnarToRow.size} ColumnarToRow execs AFTER filtering! " +
+            s"This should not happen!")
+        }
+        // scalastyle:on println
+        filteredExecs
     }.flatten.toSet
   }
 
@@ -1140,7 +1180,23 @@ object QualOutputWriter {
     sumInfo.planInfo.map(_.execInfo).collect {
       case execInfos =>
         val allExecs = flattenedExecs(execInfos)
-        allExecs.filter(exec => exec.stages.isEmpty && !exec.isSupported)
+        val columnarToRowExecs = allExecs.filter(_.exec.contains("ColumnarToRow"))
+        // Filter out operators that should be removed (e.g., ColumnarToRow, ReusedExchange)
+        // Explicitly filter out ColumnarToRow and TakeOrderedAndProjectExec as a safeguard
+        val filteredExecs = allExecs.filter(exec =>
+          !exec.exec.contains("ColumnarToRow") &&
+          !exec.exec.contains("TakeOrderedAndProject") &&
+          exec.stages.isEmpty && !exec.isSupported && !exec.shouldRemove)
+        val filteredColumnarToRow = filteredExecs.filter(_.exec.contains("ColumnarToRow"))
+        if (columnarToRowExecs.nonEmpty || filteredColumnarToRow.nonEmpty) {
+          // scalastyle:off println
+          println(s"[FILTER-DEBUG] getUnsupportedExecsWithNoStage: " +
+            s"Before filter: ${columnarToRowExecs.size} ColumnarToRow execs " +
+            s"(shouldRemove: ${columnarToRowExecs.map(_.shouldRemove)}), " +
+            s"After filter: ${filteredColumnarToRow.size} ColumnarToRow execs")
+          // scalastyle:on println
+        }
+        filteredExecs
     }.flatten.toSet
   }
 

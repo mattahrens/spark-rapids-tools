@@ -92,17 +92,24 @@ case class OperatorCounter(planInfo: PlanInfo) {
   }
 
   // Counts the execs and expressions in the execution plan excluding clusterNodes
-  // (i.e., WholeStageCodeGen).
+  // (i.e., WholeStageCodeGen). Also filters out execs that should be removed
+  // (e.g., ColumnarToRow, ReusedExchange).
   private def countOperators(): Unit = {
     planInfo.execInfo.foreach { exec =>
       if (exec.isClusterNode) {
         if (exec.children.nonEmpty) {
           exec.children.get.foreach { child =>
-            processExecInfo(child)
+            // Filter out execs that should be removed
+            if (!child.shouldRemove) {
+              processExecInfo(child)
+            }
           }
         }
       } else {
-        processExecInfo(exec)
+        // Filter out execs that should be removed
+        if (!exec.shouldRemove) {
+          processExecInfo(exec)
+        }
       }
     }
   }

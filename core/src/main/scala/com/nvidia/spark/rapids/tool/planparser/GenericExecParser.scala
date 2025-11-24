@@ -31,7 +31,8 @@ class GenericExecParser(
     val sqlID: Long,
     val execName: Option[String] = None,
     val expressionFunction: Option[String => Array[String]] = None,
-    val app: Option[AppBase] = None
+    val app: Option[AppBase] = None,
+    val ignoreExpressionChecks: Boolean = false
 ) extends ExecParser {
 
   var unsupportedReason = ""
@@ -57,7 +58,22 @@ class GenericExecParser(
     val expressions = parseExpressions()
 
     val notSupportedExprs = getNotSupportedExprs(expressions)
-    val isExecSupported = pullSupportedFlag() && notSupportedExprs.isEmpty
+    val supportedFlag = pullSupportedFlag()
+    // TakeOrderedAndProjectExec should always be marked as supported if
+    // ignoreExpressionChecks is true and the exec name matches.
+    // Also check trimmedNodeName in case the exec name is different
+    val isTakeOrderedExec = fullExecName == "TakeOrderedAndProjectExec" ||
+        fullExecName.contains("TakeOrderedAndProject") ||
+        trimmedNodeName == "TakeOrderedAndProjectExec" ||
+        trimmedNodeName.contains("TakeOrderedAndProject")
+    val isExecSupported = if (ignoreExpressionChecks && isTakeOrderedExec) {
+      // Always mark as supported - it's in supportedExecs.csv
+      true
+    } else if (ignoreExpressionChecks) {
+      supportedFlag
+    } else {
+      supportedFlag && notSupportedExprs.isEmpty
+    }
 
     val (speedupFactor, isSupported) = if (isExecSupported) {
       (pullSpeedupFactor(), true)
@@ -114,6 +130,15 @@ class GenericExecParser(
       notSupportedExprs: Seq[UnsupportedExprOpRef],
       expressions: Array[String]
   ): ExecInfo = {
+    // Ensure TakeOrderedAndProjectExec is always marked as supported if
+    // ignoreExpressionChecks is true
+    val finalIsSupported = if (ignoreExpressionChecks &&
+        (reportedExecName == "TakeOrderedAndProjectExec" ||
+         reportedExecName.contains("TakeOrderedAndProject"))) {
+      true
+    } else {
+      isSupported
+    }
     ExecInfo(
       node,
       sqlID,
@@ -123,7 +148,7 @@ class GenericExecParser(
       speedupFactor,
       duration,
       node.id,
-      isSupported,
+      finalIsSupported,
       children = getChildren,
       unsupportedExprs = notSupportedExprs,
       expressions = expressions
@@ -144,9 +169,11 @@ object GenericExecParser {
       sqlID: Long,
       execName: Option[String] = None,
       expressionFunction: Option[String => Array[String]] = None,
-      app: Option[AppBase] = None
+      app: Option[AppBase] = None,
+      ignoreExpressionChecks: Boolean = false
   ): GenericExecParser = {
     val fullExecName = execName.getOrElse(node.name + "Exec")
-    new GenericExecParser(node, checker, sqlID, Some(fullExecName), expressionFunction, app)
+    new GenericExecParser(node, checker, sqlID, Some(fullExecName), expressionFunction, app,
+      ignoreExpressionChecks)
   }
 }

@@ -1,0 +1,89 @@
+{
+  "//comments": [
+    "This file contains the mapping between Auron operators and Spark operators.",
+    "Auron operators use the 'Native' prefix and map to standard Spark operators.",
+    "Some entries have one-to-many mappings. Currently, only the first mapping in the list is used.",
+    "This limitation exists because we cannot differentiate between these operators in the SparkPlan."
+  ],
+  "NativeParquetScan": [
+    "Scan"
+  ],
+  "NativeOrcScan": [
+    "Scan"
+  ],
+  "NativeProject": [
+    "Project"
+  ],
+  "NativeFilter": [
+    "Filter"
+  ],
+  "NativeHashAggregate": [
+    "HashAggregate"
+  ],
+  "NativeSortAggregate": [
+    "SortAggregate"
+  ],
+  "NativeShuffleExchange": [
+    "Exchange",
+    "StageBoundary",
+    "BroadcastExchange"
+  ],
+  "NativeBroadcastExchange": [
+    "BroadcastExchange"
+  ],
+  "NativeSort": [
+    "Sort"
+  ],
+  "NativeUnion": [
+    "Union"
+  ],
+  "NativeWindow": [
+    "Window",
+    "RunningWindowFunction"
+  ],
+  "NativeWindowGroupLimit": [
+    "Window"
+  ],
+  "NativeGlobalLimit": [
+    "GlobalLimit"
+  ],
+  "NativeLocalLimit": [
+    "LocalLimit"
+  ],
+  "NativeTakeOrdered": [
+    "TakeOrderedAndProject"
+  ],
+  "NativePartialTakeOrdered": [
+    "TakeOrderedAndProject"
+  ],
+  "NativeExpand": [
+    "Expand"
+  ],
+  "NativeGenerate": [
+    "Generate"
+  ],
+  "NativeBroadcastHashJoin": [
+    "BroadcastHashJoin"
+  ],
+  "NativeBroadcastJoin": [
+    "BroadcastHashJoin"
+  ],
+  "NativeSortMergeJoin": [
+    "SortMergeJoin"
+  ],
+  "NativeShuffledHashJoin": [
+    "ShuffledHashJoin"
+  ],
+  "ConvertToNative": [
+    "ColumnarToRow"
+  ],
+  "InputAdapter": [
+    "ColumnarToRow"
+  ],
+  "NativeParquetInsertIntoHiveTable": [
+    "InsertIntoHiveTable"
+  ],
+  "NativeParquetSink": [
+    "FileSink"
+  ]
+}

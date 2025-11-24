@@ -466,11 +466,24 @@ class QualificationAppInfo(
     origPlanInfos.map { p =>
       val execFilteredChildren = p.execInfo.map { e =>
         val filteredChildren = e.children.map { c =>
-          c.filterNot(_.shouldRemove)
+          val beforeCount = c.count(_.exec.contains("ColumnarToRow"))
+          val filtered = c.filterNot(_.shouldRemove)
+          val afterCount = filtered.count(_.exec.contains("ColumnarToRow"))
+          if (beforeCount > 0 || afterCount > 0) {
+            logInfo(s"[FILTER-DEBUG] removeExecsShouldRemove: Filtering children of " +
+              s"${e.exec}: before=$beforeCount ColumnarToRow, after=$afterCount ColumnarToRow")
+          }
+          filtered
         }
         e.copy(children = filteredChildren)
       }
+      val beforeTopLevelCount = execFilteredChildren.count(_.exec.contains("ColumnarToRow"))
       val filteredPlanInfos = execFilteredChildren.filterNot(_.shouldRemove)
+      val afterTopLevelCount = filteredPlanInfos.count(_.exec.contains("ColumnarToRow"))
+      if (beforeTopLevelCount > 0 || afterTopLevelCount > 0) {
+        logInfo(s"[FILTER-DEBUG] removeExecsShouldRemove: Filtering top-level execs: " +
+          s"before=$beforeTopLevelCount ColumnarToRow, after=$afterTopLevelCount ColumnarToRow")
+      }
       p.copy(execInfo = filteredPlanInfos)
     }
   }
@@ -629,7 +642,7 @@ class QualificationAppInfo(
         user = info.sparkUser,
         startTime = info.startTime,
         sparkSqlDFWallClockDuration = estimatedInfo.sqlDfDuration,
-        planInfo = origPlanInfos,
+        planInfo = planInfos,  // Use filtered planInfos (after removeExecsShouldRemove)
         origPlanStageInfo = origPlanInfosSummary.flatMap(_.stageSum),
         stageInfo = perSqlStageSummary.flatMap(_.stageSum),
         estimatedInfo = estimatedInfo,

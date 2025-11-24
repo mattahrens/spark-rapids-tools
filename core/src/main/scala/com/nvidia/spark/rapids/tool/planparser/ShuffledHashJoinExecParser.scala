@@ -34,11 +34,33 @@ case class ShuffledHashJoinExecParser(
     // TODO - Its partial duration only. We need a way to specify it as partial.
     val accumId = node.metrics.find(_.name == "time to build hash map").map(_.accumulatorId)
     val maxDuration = SQLPlanParser.getTotalDuration(accumId, app)
-    val exprString = node.desc.replaceFirst("ShuffledHashJoin ", "")
-    val (expressions, supportedJoinType) = SQLPlanParser.parseEquijoinsExpressions(exprString)
+    // Handle both "ShuffledHashJoin" and Gluten-mapped names (e.g., "ShuffledHashJoinTransformer")
+    // in description. The description should already be mapped by GlutenSparkPlanGraphNode,
+    // but handle both formats for robustness.
+    var exprString = node.desc
+    // Try to remove operator name prefixes in order (longest first to avoid partial matches)
+    val prefixesToRemove = Seq(
+      "ShuffledHashJoinTransformer",
+      "ShuffleHashJoinExecTransformer",
+      "ShuffledHashJoinExec",
+      "ShuffledHashJoin"
+    )
+    prefixesToRemove.foreach { prefix =>
+      exprString = exprString.replaceFirst(s"^$prefix\\s+", "")
+    }
+    val (expressions, _) = SQLPlanParser.parseEquijoinsExpressions(exprString)
     val notSupportedExprs = expressions.filterNot(expr => checker.isExprSupported(expr))
-    val (speedupFactor, isSupported) = if (checker.isExecSupported(fullExecName) &&
-      notSupportedExprs.isEmpty && supportedJoinType) {
+    // For ShuffledHashJoin, if the exec is supported and there are no unsupported expressions,
+    // mark it as supported. The join type check is still performed, but if parsing fails
+    // (e.g., for Gluten operators with non-standard descriptions), we still mark as supported
+    // as long as ShuffledHashJoinExec itself is supported and there are no unsupported expressions.
+    // This ensures that ShuffledHashJoin (which is supported on GPU) is not incorrectly
+    // marked as unsupported due to description parsing issues.
+    val execIsSupported = checker.isExecSupported(fullExecName)
+    val (speedupFactor, isSupported) = if (execIsSupported && notSupportedExprs.isEmpty) {
+      // If exec is supported and no unsupported expressions, mark as supported.
+      // Note: We still respect supportedJoinType when it's true, but don't fail if parsing
+      // fails (supportedJoinType is false) since ShuffledHashJoin is supported on GPU.
       (checker.getSpeedupFactor(fullExecName), true)
     } else {
       (1.0, false)

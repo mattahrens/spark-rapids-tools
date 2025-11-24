@@ -18,6 +18,8 @@ package org.apache.spark.sql.rapids.tool.util
 
 import scala.jdk.CollectionConverters._
 
+import com.nvidia.spark.rapids.tool.planparser.AuronParseHelper
+import com.nvidia.spark.rapids.tool.planparser.GlutenParseHelper
 import com.nvidia.spark.rapids.tool.planparser.HiveParseHelper
 import com.nvidia.spark.rapids.tool.planparser.delta.DeltaLakeHelper
 import com.nvidia.spark.rapids.tool.planparser.iceberg.IcebergHelper
@@ -51,14 +53,34 @@ object SparkRuntime extends Enumeration {
   val PHOTON: SparkRuntime = Value
 
   /**
+   * Represents the Auron runtime environment.
+   */
+  val AURON: SparkRuntime = Value
+
+  /**
+   * Represents the Gluten runtime environment.
+   */
+  val GLUTEN: SparkRuntime = Value
+
+  /**
    * Returns the SparkRuntime value based on the given parameters.
    * @param isPhoton Boolean flag indicating whether the application is running on Photon.
+   * @param isAuron  Boolean flag indicating whether the application is running on Auron.
+   * @param isGluten Boolean flag indicating whether the application is running on Gluten.
    * @param isGpu    Boolean flag indicating whether the application is running on GPU.
    * @return
    */
-  def getRuntime(isPhoton: Boolean, isGpu: Boolean): SparkRuntime.SparkRuntime = {
+  def getRuntime(
+      isPhoton: Boolean,
+      isAuron: Boolean,
+      isGluten: Boolean,
+      isGpu: Boolean): SparkRuntime.SparkRuntime = {
     if (isPhoton) {
       PHOTON
+    } else if (isAuron) {
+      AURON
+    } else if (isGluten) {
+      GLUTEN
     } else if (isGpu) {
       SPARK_RAPIDS
     } else {
@@ -114,6 +136,10 @@ trait CacheablePropsHandler {
   var gpuMode = false
   // A flag to indicate whether the eventlog is an eventlog from Photon runtime.
   var isPhoton = false
+  // A flag to indicate whether the eventlog is an eventlog from Auron runtime.
+  var isAuron = false
+  // A flag to indicate whether the eventlog is an eventlog from Gluten runtime.
+  var isGluten = false
   // A flag whether hive is enabled or not. Note that we assume that the
   // property is global to the entire application once it is set. a.k.a, it cannot be disabled
   // once it was set to true.
@@ -153,6 +179,16 @@ trait CacheablePropsHandler {
 
   def updatePredicatesFromSparkProperties(): Unit = {
     gpuMode ||= ProfileUtils.isPluginEnabled(sparkProperties)
+    isAuron ||= AuronParseHelper.isAuronApp(sparkProperties)
+    val wasGluten = isGluten
+    isGluten ||= GlutenParseHelper.isGlutenApp(sparkProperties)
+    if (isGluten && !wasGluten) {
+      // Log when Gluten is first detected - use println since we don't have logger here
+      // scalastyle:off println
+      println(s"[GLUTEN-DEBUG] updatePredicatesFromSparkProperties: " +
+        s"Gluten app detected! isGluten flag set to true")
+      // scalastyle:on println
+    }
     icebergEnabled ||= IcebergHelper.isIcebergEnabled(sparkProperties)
     deltaLakeEnabled ||= DeltaLakeHelper.isDeltaLakeEnabled(sparkProperties)
     hiveEnabled ||= HiveParseHelper.isHiveEnabled(sparkProperties)
@@ -193,6 +229,6 @@ trait CacheablePropsHandler {
    * This is calculated based on other cached properties.
    */
   def getSparkRuntime: SparkRuntime.SparkRuntime = {
-    SparkRuntime.getRuntime(isPhoton, gpuMode)
+    SparkRuntime.getRuntime(isPhoton, isAuron, isGluten, gpuMode)
   }
 }

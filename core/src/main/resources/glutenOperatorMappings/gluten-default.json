@@ -1,0 +1,209 @@
+{
+  "//comments": [
+    "This file contains the mapping between Gluten operators and Spark operators.",
+    "Gluten operators use various prefixes like 'ArrowFile', 'Arrow', 'Columnar', 'Velox', 'CH', etc.",
+    "Some entries have one-to-many mappings. Currently, only the first mapping in the list is used.",
+    "This limitation exists because we cannot differentiate between these operators in the SparkPlan.",
+    "Mappings are based on Gluten documentation: velox-backend-support-progress.md"
+  ],
+  "ArrowFileSourceScan": [
+    "Scan"
+  ],
+  "ArrowBatchScan": [
+    "Scan"
+  ],
+  "FileSourceScanExecTransformer": [
+    "Scan"
+  ],
+  "BatchScanExecTransformer": [
+    "Scan"
+  ],
+  "ScanTransformer": [
+    "Scan"
+  ],
+  "Scan": [
+    "Scan"
+  ],
+  "Scan parquet": [
+    "Scan"
+  ],
+  "ColumnarShuffleExchange": [
+    "Exchange",
+    "StageBoundary",
+    "BroadcastExchange"
+  ],
+  "ColumnarShuffleExchangeExec": [
+    "Exchange",
+    "StageBoundary",
+    "BroadcastExchange"
+  ],
+  "ColumnarBroadcastExchange": [
+    "BroadcastExchange"
+  ],
+  "ColumnarBroadcastExchangeExec": [
+    "BroadcastExchange"
+  ],
+  "ColumnarToRow": [
+    "ColumnarToRow"
+  ],
+  "VeloxColumnarToRow": [
+    "ColumnarToRow"
+  ],
+  "Velox2Row": [
+    "ColumnarToRow"
+  ],
+  "CHColumnarToRow": [
+    "ColumnarToRow"
+  ],
+  "RowToColumnar": [
+    "RowToColumnar"
+  ],
+  "RowToVeloxColumnar": [
+    "RowToColumnar"
+  ],
+  "RowToCHColumnar": [
+    "RowToColumnar"
+  ],
+  "HashAggregateExecTransformer": [
+    "HashAggregate"
+  ],
+  "HashAggregateBaseTransformer": [
+    "HashAggregate"
+  ],
+  "HashAggregateExecBaseTransformer": [
+    "HashAggregate"
+  ],
+  "HashAggregateTransformer": [
+    "HashAggregate"
+  ],
+  "RegularHashAggregateExec": [
+    "HashAggregate"
+  ],
+  "RegularHashAggregateExecTransformer": [
+    "HashAggregate"
+  ],
+  "FlushableHashAggregateExec": [
+    "HashAggregate"
+  ],
+  "FlushableHashAggregateExecTransformer": [
+    "HashAggregate"
+  ],
+  "SortAggregateExecTransformer": [
+    "SortAggregate"
+  ],
+  "HashJoinExecTransformer": [
+    "BroadcastHashJoin",
+    "ShuffledHashJoin"
+  ],
+  "ShuffleHashJoinExecTransformer": [
+    "ShuffledHashJoin"
+  ],
+  "ShuffledHashJoinExec": [
+    "ShuffledHashJoin"
+  ],
+  "ShuffledHashJoinExecTransformer": [
+    "ShuffledHashJoin"
+  ],
+  "ShuffledHashJoinTransformer": [
+    "ShuffledHashJoin"
+  ],
+  "SortMergeJoinExecTransformer": [
+    "SortMergeJoin"
+  ],
+  "BroadcastHashJoinExecTransformer": [
+    "BroadcastHashJoin"
+  ],
+  "BroadcastNestedLoopJoinExecTransformer": [
+    "BroadcastNestedLoopJoin"
+  ],
+  "VeloxBroadcastNestedLoopJoinExecTransformer": [
+    "BroadcastNestedLoopJoin"
+  ],
+  "CartesianProductExecTransformer": [
+    "CartesianProduct"
+  ],
+  "FilterExecTransformer": [
+    "Filter"
+  ],
+  "ProjectExecTransformer": [
+    "Project"
+  ],
+  "ColumnarPartialProject": [
+    "Project"
+  ],
+  "GenerateExecTransformer": [
+    "Generate"
+  ],
+  "ColumnarPartialGenerate": [
+    "Generate"
+  ],
+  "SortExecTransformer": [
+    "Sort"
+  ],
+  "TopNTransformer": [
+    "TakeOrderedAndProject"
+  ],
+  "TakeOrderedAndProjectExecTransformer": [
+    "TakeOrderedAndProject"
+  ],
+  "LimitExecTransformer": [
+    "GlobalLimit",
+    "LocalLimit"
+  ],
+  "LimitTransformer": [
+    "GlobalLimit",
+    "LocalLimit"
+  ],
+  "ColumnarCollectLimit": [
+    "CollectLimit"
+  ],
+  "ColumnarCollectLimitExec": [
+    "CollectLimit"
+  ],
+  "ColumnarCollectTail": [
+    "CollectTail"
+  ],
+  "ColumnarCollectTailExec": [
+    "CollectTail"
+  ],
+  "UnionExecTransformer": [
+    "Union"
+  ],
+  "ExpandExecTransformer": [
+    "Expand"
+  ],
+  "WindowExecTransformer": [
+    "Window",
+    "RunningWindowFunction"
+  ],
+  "WindowGroupLimitExec": [
+    "Window"
+  ],
+  "CoalesceExecTransformer": [
+    "Coalesce"
+  ],
+  "SampleExecTransformer": [
+    "Sample"
+  ],
+  "ColumnarRange": [
+    "Range"
+  ],
+  "ColumnarRangeExec": [
+    "Range"
+  ],
+  "ColumnarArrowEvalPython": [
+    "ArrowEvalPython"
+  ],
+  "VeloxColumnarWriteFiles": [
+    "WriteFiles"
+  ],
+  "VeloxResizeBatches": [
+    "WholeStageCodegen"
+  ],
+  "ColumnarToColumnarTransition": [
+    "WholeStageCodegen"
+  ],
+  "InputIterator": [
+    "WholeStageCodegen"
+  ]
+}

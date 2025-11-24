@@ -16,26 +16,37 @@
 
 package org.apache.spark.sql.rapids.tool.util.plangraph
 
-import com.nvidia.spark.rapids.tool.planparser.DatabricksParseHelper
+import com.nvidia.spark.rapids.tool.planparser.{AuronParseHelper, DatabricksParseHelper, GlutenParseHelper}
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.ui.{SparkPlanGraphCluster, SparkPlanGraphNode}
 
 
 /**
  * Object responsible for transforming instances of SparkPlanGraphNode and SparkPlanGraphCluster
- * to specialized instances (e.g. PhotonSparkPlanGraphNode) if they are of a specialized type.
+ * to specialized instances (e.g. PhotonSparkPlanGraphNode, AuronSparkPlanGraphNode,
+ * GlutenSparkPlanGraphNode) if they are of a specialized type.
  *
  * This can be extended to handle other types of nodes or clusters (e.g. GPU nodes or Velox nodes).
  */
-object PlanGraphTransformer {
+object PlanGraphTransformer extends Logging {
 
   /**
    * Transforms a SparkPlanGraphNode and returns a specialized node if it is of a specialized
-   * type (e.g. Photon).
+   * type (e.g. Photon, Auron, Gluten).
    */
   def transformPlanNode(node: SparkPlanGraphNode): SparkPlanGraphNode = {
     if (DatabricksParseHelper.isPhotonNode(node.name)) {
       PhotonSparkPlanGraphNode.from(node)
+    } else if (AuronParseHelper.isAuronNode(node.name)) {
+      AuronSparkPlanGraphNode.from(node)
+    } else if (GlutenParseHelper.isGlutenNode(node.name)) {
+      logInfo(s"[GLUTEN-DEBUG] transformPlanNode: Transforming Gluten node: " +
+        s"'${node.name}' (nodeId: ${node.id})")
+      val transformed = GlutenSparkPlanGraphNode.from(node)
+      logInfo(s"[GLUTEN-DEBUG] transformPlanNode: Transformed '${node.name}' -> " +
+        s"'${transformed.name}'")
+      transformed
     } else { // More cases can be added here to handle other types of nodes
       node
     }
@@ -43,11 +54,15 @@ object PlanGraphTransformer {
 
   /**
    * Transforms a SparkPlanGraphCluster and returns a specialized cluster if it is of a specialized
-   * type (e.g. Photon).
+   * type (e.g. Photon, Auron, Gluten).
    */
   def transformPlanCluster(cluster: SparkPlanGraphCluster): SparkPlanGraphCluster = {
     if (DatabricksParseHelper.isPhotonNode(cluster.name)) {
       PhotonSparkPlanGraphCluster.from(cluster)
+    } else if (AuronParseHelper.isAuronNode(cluster.name)) {
+      AuronSparkPlanGraphCluster.from(cluster)
+    } else if (GlutenParseHelper.isGlutenNode(cluster.name)) {
+      GlutenSparkPlanGraphCluster.from(cluster)
     } else { // More cases can be added here to handle other types of clusters
       cluster
     }

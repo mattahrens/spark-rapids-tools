@@ -356,7 +356,7 @@ abstract class Platform(var gpuDevice: Option[GpuDevice],
   val defaultRuntime: SparkRuntime.SparkRuntime = SparkRuntime.SPARK
   // Set of supported runtimes for the platform
   protected val supportedRuntimes: Set[SparkRuntime.SparkRuntime] = Set(
-    SparkRuntime.SPARK, SparkRuntime.SPARK_RAPIDS
+    SparkRuntime.SPARK, SparkRuntime.SPARK_RAPIDS, SparkRuntime.AURON, SparkRuntime.GLUTEN
   )
 
   // scalastyle:off line.size.limit
@@ -767,7 +767,8 @@ abstract class DatabricksPlatform(gpuDevice: Option[GpuDevice],
   override def isPlatformCSP: Boolean = true
 
   override val supportedRuntimes: Set[SparkRuntime.SparkRuntime] = Set(
-    SparkRuntime.SPARK, SparkRuntime.SPARK_RAPIDS, SparkRuntime.PHOTON
+    SparkRuntime.SPARK, SparkRuntime.SPARK_RAPIDS, SparkRuntime.PHOTON,
+    SparkRuntime.AURON, SparkRuntime.GLUTEN
   )
 
   // note that Databricks generally sets the spark.executor.memory for the user.  Our
@@ -935,6 +936,10 @@ class OnPremPlatform(gpuDevice: Option[GpuDevice],
   // on prem is hard since we don't know what node configurations they have
   // assume 1 for now. We should have them pass this information in the future.
   override lazy val maxGpusSupported: Int = 1
+
+  override val supportedRuntimes: Set[SparkRuntime.SparkRuntime] = Set(
+    SparkRuntime.SPARK, SparkRuntime.SPARK_RAPIDS, SparkRuntime.AURON, SparkRuntime.GLUTEN
+  )
 
   /**
    * For OnPrem, setting this value to 1.0 since we are calculating the

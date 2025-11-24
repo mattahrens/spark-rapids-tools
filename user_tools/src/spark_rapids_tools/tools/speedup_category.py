@@ -77,7 +77,11 @@ class SpeedupCategory:
         def calculate_category(single_row: pd.Series) -> Optional[str]:
             spark_runtime = single_row.get(spark_runtime_col_name).lower()
             # Get the speedup strategy and its categories for the given runtime type.
-            categories = self.speedup_strategies.get(spark_runtime).get_categories()
+            strategy = self.speedup_strategies.get(spark_runtime)
+            if strategy is None:
+                # If no strategy is defined for this runtime, return None
+                return None
+            categories = strategy.get_categories()
             col_value = single_row.get(speedup_col_name)
             for category in categories:
                 if category.get('lowerBound') <= col_value < category.get('upperBound'):
@@ -110,7 +114,11 @@ class SpeedupCategory:
         def process_row(single_row: pd.Series) -> pd.Series:
             spark_runtime = single_row.get(spark_runtime_col_name).lower()
             # Get the speedup strategy and its eligibility conditions for the given runtime type.
-            eligibility_conditions = self.speedup_strategies.get(spark_runtime).get_eligibility_conditions()
+            strategy = self.speedup_strategies.get(spark_runtime)
+            if strategy is None:
+                # If no strategy is defined for this runtime, skip processing eligibility conditions
+                return single_row
+            eligibility_conditions = strategy.get_eligibility_conditions()
             for entry in eligibility_conditions:
                 col_value = single_row[entry.get('columnName')]
                 # Have to convert the values to float because the input data is in string format
